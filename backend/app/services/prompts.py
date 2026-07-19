@@ -51,6 +51,20 @@ SCHEMA_DESCRIPTION: str = dedent(
     - Pace is in seconds per kilometer (running/swimming).
     - Choose the target type that matches the sport.
     - Repeat blocks should be used when the description has a "Nx" pattern.
+
+    Pace formatting:
+    - Pace is a small number of seconds per km. Faster running = SMALLER
+      sec/km. A 4:00/km interval is 240 sec/km, not 4. A 5:30/km easy jog
+      is 330 sec/km, not 5.3. A recovery jog is several hundred sec/km, not
+      a few dozen.
+    - Round pace values to the nearest 5 seconds. Do not invent a lower
+      bound — running pace is realistic anywhere from about 150 sec/km
+      (very fast intervals) up to 600 sec/km (very easy jogs), and
+      everything in that range is valid. The 5-second rule is purely about
+      snapping to clean numbers like 240, 245, 250 — not 247 or 253.
+    - Keep the pace range narrow: min_sec_per_km and max_sec_per_km should
+      differ by at most 20 seconds. The range is where to aim on a given
+      day, not the full possible spectrum.
     """
 ).strip()
 
