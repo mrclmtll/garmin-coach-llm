@@ -242,7 +242,7 @@ export function WorkoutBuilder() {
             <StepCard step={workout.cooldown} onChange={(s) => setStep("cooldown", s)} onRemove={() => setStep("cooldown", null)} />
           )}
 
-          <div className="card flex items-center gap-3">
+          <div className="sticky bottom-4 z-10 mx-6 flex items-center gap-3 rounded-xl border border-white/10 bg-surface-800/50 p-4 shadow-lg backdrop-blur-md">
             <button className="btn-primary" onClick={push} disabled={loading}>
               {loading ? "Pushing…" : "Push to Garmin"}
             </button>
