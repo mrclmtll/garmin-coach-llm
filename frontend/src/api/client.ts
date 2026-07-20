@@ -33,24 +33,36 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
+export interface GeneratedWorkout {
+  workout: Workout;
+}
+
 export interface CreatedWorkout {
   id: number;
   workout: Workout;
 }
 
-export async function generateFromText(text: string): Promise<CreatedWorkout> {
-  return request<CreatedWorkout>("/workouts/from-text", {
+export async function generateFromText(text: string): Promise<GeneratedWorkout> {
+  return request<GeneratedWorkout>("/workouts/from-text", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text }),
   });
 }
 
-export async function generateFromTemplate(text: string): Promise<CreatedWorkout> {
-  return request<CreatedWorkout>("/workouts/from-template", {
+export async function generateFromTemplate(text: string): Promise<GeneratedWorkout> {
+  return request<GeneratedWorkout>("/workouts/from-template", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text }),
+  });
+}
+
+export async function createWorkout(workout: Workout, source: string): Promise<CreatedWorkout> {
+  return request<CreatedWorkout>("/workouts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ workout, source }),
   });
 }
 

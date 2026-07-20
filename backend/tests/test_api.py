@@ -62,9 +62,9 @@ def test_from_text_returns_422_when_ollama_unreachable(
     assert "detail" in r.json()
 
 
-def test_create_response_shape_includes_id(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Sanity check: the create endpoint returns {id, workout}, not just the workout.
-    The client relies on `id` to push without a second roundtrip."""
+def test_generate_from_text_does_not_persist(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Generation only returns {workout} — nothing is written to the DB until
+    the client explicitly calls POST /workouts (Save) or /workouts/{id}/push."""
     from app.schemas.workout import Workout
 
     fake_workout = Workout.model_validate(
@@ -108,7 +108,16 @@ def test_create_response_shape_includes_id(monkeypatch: pytest.MonkeyPatch) -> N
 
     with TestClient(app) as c:
         r = c.post("/workouts/from-text", json={"text": "easy run"})
-        assert r.status_code == 201
+        assert r.status_code == 200
         body = r.json()
-        assert "id" in body and isinstance(body["id"], int)
+        assert "id" not in body
         assert body["workout"]["name"] == "Easy Run"
+        assert c.get("/workouts").json() == []
+
+        # Saving persists it and hands back an id for a subsequent push.
+        r = c.post("/workouts", json={"workout": body["workout"], "source": "text"})
+        assert r.status_code == 201
+        saved = r.json()
+        assert isinstance(saved["id"], int)
+        assert saved["workout"]["name"] == "Easy Run"
+        assert len(c.get("/workouts").json()) == 1

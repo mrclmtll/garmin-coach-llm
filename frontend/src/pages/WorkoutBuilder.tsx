@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { generateFromTemplate, generateFromText, pushWorkout, saveWorkout } from "../api/client";
+import {
+  createWorkout,
+  generateFromTemplate,
+  generateFromText,
+  pushWorkout,
+  saveWorkout,
+} from "../api/client";
 import type { Step, Workout } from "../api/types";
 import { GarminWorkouts } from "../components/GarminWorkouts";
 import { RepeatBlockView } from "../components/RepeatBlockView";
@@ -43,6 +49,9 @@ export function WorkoutBuilder() {
   const [savedOpen, setSavedOpen] = useState(true);
   const [garminOpen, setGarminOpen] = useState(true);
 
+  // Source recorded on first save — mirrors how the workout was produced.
+  const sourceForMode = () => (mode === "free_text" ? "text" : "template");
+
   const generate = async () => {
     setLoading(true);
     setError(null);
@@ -51,8 +60,37 @@ export function WorkoutBuilder() {
       const fn = mode === "free_text" ? generateFromText : generateFromTemplate;
       const res = await fn(input);
       setWorkout(res.workout);
+      setWorkoutId(null);
+      setDirty(true);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Persists the current workout: creates it on first save, updates it after.
+  const persist = async (): Promise<number> => {
+    if (!workout) throw new Error("no workout to save");
+    if (workoutId == null) {
+      const res = await createWorkout(workout, sourceForMode());
       setWorkoutId(res.id);
       setDirty(false);
+      return res.id;
+    }
+    if (dirty) {
+      await saveWorkout(workoutId, workout);
+      setDirty(false);
+    }
+    return workoutId;
+  };
+
+  const save = async () => {
+    if (!workout) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await persist();
       setRefreshKey((k) => k + 1);
     } catch (e) {
       setError((e as Error).message);
@@ -62,16 +100,13 @@ export function WorkoutBuilder() {
   };
 
   const push = async () => {
-    if (!workout || workoutId == null) return;
+    if (!workout) return;
     setLoading(true);
     setError(null);
     setPushInfo(null);
     try {
-      if (dirty) {
-        await saveWorkout(workoutId, workout);
-        setDirty(false);
-      }
-      const result = await pushWorkout(workoutId);
+      const id = await persist();
+      const result = await pushWorkout(id);
       const idPart = result.garmin_workout_id ? ` (Garmin id ${result.garmin_workout_id})` : "";
       setPushInfo(`Pushed "${workout.name}"${idPart}.`);
       setRefreshKey((k) => k + 1);
@@ -211,7 +246,10 @@ export function WorkoutBuilder() {
             <button className="btn-primary" onClick={push} disabled={loading}>
               {loading ? "Pushing…" : "Push to Garmin"}
             </button>
-            {dirty && <span className="text-xs text-amber-400">Unsaved changes — will be saved on push</span>}
+            <button className="btn-ghost" onClick={save} disabled={loading || !dirty}>
+              {loading ? "Saving…" : "Save"}
+            </button>
+            {dirty && <span className="text-xs text-amber-400">Unsaved changes</span>}
             {pushInfo && <p className="text-sm text-slate-300">{pushInfo}</p>}
             {workoutId !== null && <span className="ml-auto text-xs text-slate-500">Workout id: {workoutId}</span>}
           </div>

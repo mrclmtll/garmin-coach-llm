@@ -32,8 +32,19 @@ class FromTemplateRequest(BaseModel):
     sport: str | None = None
 
 
+class GeneratedWorkout(BaseModel):
+    """Returned by the LLM generation endpoints. Not yet persisted."""
+
+    workout: Workout
+
+
+class SaveWorkoutRequest(BaseModel):
+    workout: Workout
+    source: str = "manual"
+
+
 class CreatedWorkout(BaseModel):
-    """Returned by create endpoints so the client can push without a second roundtrip."""
+    """Returned once a workout is persisted so the client can push without a second roundtrip."""
 
     id: int
     workout: Workout
@@ -95,28 +106,30 @@ def _persist(db: Session, workout: Workout, source: str) -> WorkoutRow:
     return row
 
 
-@router.post("/from-text", response_model=CreatedWorkout, status_code=status.HTTP_201_CREATED)
-def create_from_text(
-    req: FromTextRequest, db: Annotated[Session, Depends(get_db)]
-) -> CreatedWorkout:
+@router.post("/from-text", response_model=GeneratedWorkout)
+def create_from_text(req: FromTextRequest) -> GeneratedWorkout:
     try:
         workout = llm.generate_workout(mode="free_text", user_text=req.text)
     except llm.WorkoutGenerationError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
-    row = _persist(db, workout, source="text")
-    return CreatedWorkout(id=row.id, workout=workout)
+    return GeneratedWorkout(workout=workout)
 
 
-@router.post("/from-template", response_model=CreatedWorkout, status_code=status.HTTP_201_CREATED)
-def create_from_template(
-    req: FromTemplateRequest, db: Annotated[Session, Depends(get_db)]
-) -> CreatedWorkout:
+@router.post("/from-template", response_model=GeneratedWorkout)
+def create_from_template(req: FromTemplateRequest) -> GeneratedWorkout:
     try:
         workout = llm.generate_workout(mode="template", user_text=req.text)
     except llm.WorkoutGenerationError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
-    row = _persist(db, workout, source="template")
-    return CreatedWorkout(id=row.id, workout=workout)
+    return GeneratedWorkout(workout=workout)
+
+
+@router.post("", response_model=CreatedWorkout, status_code=status.HTTP_201_CREATED)
+def create_workout(
+    req: SaveWorkoutRequest, db: Annotated[Session, Depends(get_db)]
+) -> CreatedWorkout:
+    row = _persist(db, req.workout, source=req.source)
+    return CreatedWorkout(id=row.id, workout=req.workout)
 
 
 @router.get("", response_model=list[WorkoutSummary])
