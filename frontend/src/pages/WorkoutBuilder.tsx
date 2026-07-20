@@ -99,6 +99,24 @@ export function WorkoutBuilder() {
     }
   };
 
+  // Persists the current (edited) workout as a brand-new row, leaving the
+  // original saved workout untouched.
+  const saveAsNew = async () => {
+    if (!workout) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await createWorkout(workout, sourceForMode());
+      setWorkoutId(res.id);
+      setDirty(false);
+      setRefreshKey((k) => k + 1);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const push = async () => {
     if (!workout) return;
     setLoading(true);
@@ -249,6 +267,11 @@ export function WorkoutBuilder() {
             <button className="btn-ghost" onClick={save} disabled={loading || !dirty}>
               {loading ? "Saving…" : "Save"}
             </button>
+            {workoutId !== null && dirty && (
+              <button className="btn-ghost" onClick={saveAsNew} disabled={loading}>
+                {loading ? "Saving…" : "Save as new workout"}
+              </button>
+            )}
             {dirty && <span className="text-xs text-amber-400">Unsaved changes</span>}
             {pushInfo && <p className="text-sm text-slate-300">{pushInfo}</p>}
             {workoutId !== null && <span className="ml-auto text-xs text-slate-500">Workout id: {workoutId}</span>}
