@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { generateFromTemplate, generateFromText, pushWorkout, saveWorkout } from "../api/client";
 import type { Step, Workout } from "../api/types";
+import { GarminWorkouts } from "../components/GarminWorkouts";
 import { RepeatBlockView } from "../components/RepeatBlockView";
 import { SavedWorkouts } from "../components/SavedWorkouts";
 import { StepCard } from "../components/StepCard";
@@ -39,6 +40,8 @@ export function WorkoutBuilder() {
   const [dirty, setDirty] = useState(false);
   // Bumped after each successful generate/push so SavedWorkouts re-fetches.
   const [refreshKey, setRefreshKey] = useState(0);
+  const [savedOpen, setSavedOpen] = useState(true);
+  const [garminOpen, setGarminOpen] = useState(true);
 
   const generate = async () => {
     setLoading(true);
@@ -215,8 +218,23 @@ export function WorkoutBuilder() {
         </section>
       )}
       </div>
-      <aside className="hidden lg:block sticky top-4 self-start">
-        <SavedWorkouts refreshKey={refreshKey} activeId={workoutId} onLoad={loadWorkout} />
+      <aside
+        className={`sticky top-4 hidden self-start lg:flex lg:flex-col lg:gap-4 ${
+          savedOpen || garminOpen ? "lg:h-[calc(100vh-10rem)]" : ""
+        }`}
+      >
+        <SavedWorkouts
+          refreshKey={refreshKey}
+          activeId={workoutId}
+          onLoad={loadWorkout}
+          open={savedOpen}
+          onToggle={() => setSavedOpen((v) => !v)}
+        />
+        <GarminWorkouts
+          refreshKey={refreshKey}
+          open={garminOpen}
+          onToggle={() => setGarminOpen((v) => !v)}
+        />
       </aside>
     </div>
   );

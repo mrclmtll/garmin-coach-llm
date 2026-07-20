@@ -48,3 +48,12 @@ export interface WorkoutSummary {
   pushed_at: string | null;
   garmin_workout_id: string | null;
 }
+
+// Lightweight row for a workout already in the Garmin library — backend GET /workouts/garmin.
+export interface GarminWorkoutSummary {
+  id: string;
+  name: string;
+  sport: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}

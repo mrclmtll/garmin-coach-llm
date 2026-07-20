@@ -42,6 +42,12 @@ def _get_client() -> Garmin:
     return _client
 
 
+def list_workouts(start: int = 0, limit: int = 100) -> list[dict[str, Any]]:
+    """Return raw workout dicts currently stored in the Garmin workout library."""
+    client = _get_client()
+    return client.get_workouts(start=start, limit=limit)
+
+
 def push_workout(workout: Workout) -> dict[str, Any]:
     """Translate to the garminconnect workout model and upload it.
 

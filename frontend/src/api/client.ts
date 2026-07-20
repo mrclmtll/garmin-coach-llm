@@ -1,4 +1,4 @@
-import type { Workout, WorkoutSummary } from "./types";
+import type { GarminWorkoutSummary, Workout, WorkoutSummary } from "./types";
 
 const BASE = "/api"; // proxied to backend in dev
 
@@ -72,4 +72,8 @@ export async function listWorkouts(): Promise<WorkoutSummary[]> {
 
 export async function getWorkout(id: number): Promise<Workout> {
   return request<Workout>(`/workouts/${id}`);
+}
+
+export async function listGarminWorkouts(): Promise<GarminWorkoutSummary[]> {
+  return request<GarminWorkoutSummary[]>("/workouts/garmin");
 }

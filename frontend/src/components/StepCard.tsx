@@ -105,7 +105,10 @@ export function StepCard({ step, onChange, onRemove }: Props) {
                 className="input"
                 type="number"
                 value={step.target.min_sec_per_km}
-                onChange={(e) => onChange({ ...step, target: { ...step.target, min_sec_per_km: Number(e.target.value) } })}
+                onChange={(e) => {
+                  if (step.target.kind !== "pace") return;
+                  onChange({ ...step, target: { ...step.target, min_sec_per_km: Number(e.target.value) } });
+                }}
               />
               <p className="mt-1 text-xs text-slate-500">{formatPace(step.target.min_sec_per_km)}</p>
             </div>
@@ -115,7 +118,10 @@ export function StepCard({ step, onChange, onRemove }: Props) {
                 className="input"
                 type="number"
                 value={step.target.max_sec_per_km}
-                onChange={(e) => onChange({ ...step, target: { ...step.target, max_sec_per_km: Number(e.target.value) } })}
+                onChange={(e) => {
+                  if (step.target.kind !== "pace") return;
+                  onChange({ ...step, target: { ...step.target, max_sec_per_km: Number(e.target.value) } });
+                }}
               />
               <p className="mt-1 text-xs text-slate-500">{formatPace(step.target.max_sec_per_km)}</p>
             </div>
@@ -129,7 +135,10 @@ export function StepCard({ step, onChange, onRemove }: Props) {
                 className="input"
                 type="number"
                 value={step.target.min_watts}
-                onChange={(e) => onChange({ ...step, target: { ...step.target, min_watts: Number(e.target.value) } })}
+                onChange={(e) => {
+                  if (step.target.kind !== "power") return;
+                  onChange({ ...step, target: { ...step.target, min_watts: Number(e.target.value) } });
+                }}
               />
             </div>
             <div>
@@ -138,7 +147,10 @@ export function StepCard({ step, onChange, onRemove }: Props) {
                 className="input"
                 type="number"
                 value={step.target.max_watts}
-                onChange={(e) => onChange({ ...step, target: { ...step.target, max_watts: Number(e.target.value) } })}
+                onChange={(e) => {
+                  if (step.target.kind !== "power") return;
+                  onChange({ ...step, target: { ...step.target, max_watts: Number(e.target.value) } });
+                }}
               />
             </div>
           </div>
@@ -149,7 +161,10 @@ export function StepCard({ step, onChange, onRemove }: Props) {
             <select
               className="input"
               value={step.target.zone}
-              onChange={(e) => onChange({ ...step, target: { ...step.target, zone: Number(e.target.value) as 1 | 2 | 3 | 4 | 5 } })}
+              onChange={(e) => {
+                if (step.target.kind !== "hr_zone") return;
+                onChange({ ...step, target: { ...step.target, zone: Number(e.target.value) as 1 | 2 | 3 | 4 | 5 } });
+              }}
             >
               {[1, 2, 3, 4, 5].map((z) => <option key={z} value={z}>{z}</option>)}
             </select>

@@ -57,6 +57,27 @@ class WorkoutSummary(BaseModel):
     garmin_workout_id: str | None
 
 
+class GarminWorkoutSummary(BaseModel):
+    """Lightweight row for a workout that lives in the Garmin workout library."""
+
+    id: str
+    name: str
+    sport: str | None
+    created_at: str | None
+    updated_at: str | None
+
+
+def _map_garmin_workout(raw: dict) -> GarminWorkoutSummary:
+    sport_type = raw.get("sportType") or {}
+    return GarminWorkoutSummary(
+        id=str(raw.get("workoutId")),
+        name=raw.get("workoutName") or "Untitled",
+        sport=sport_type.get("sportTypeKey"),
+        created_at=raw.get("createdDate"),
+        updated_at=raw.get("updatedDate"),
+    )
+
+
 def _row_to_workout(row: WorkoutRow) -> Workout:
     return Workout.model_validate(row.payload)
 
@@ -113,6 +134,18 @@ def list_workouts(db: Annotated[Session, Depends(get_db)]) -> list[WorkoutSummar
         )
         for r in rows
     ]
+
+
+@router.get("/garmin", response_model=list[GarminWorkoutSummary])
+def list_garmin_workouts() -> list[GarminWorkoutSummary]:
+    try:
+        raw = garmin.list_workouts()
+    except RuntimeError as e:
+        # Missing creds etc.
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except Exception as e:  # garminconnect raises a variety of types
+        raise HTTPException(status_code=502, detail=f"garmin fetch failed: {e}") from e
+    return [_map_garmin_workout(w) for w in raw]
 
 
 @router.get("/{workout_id}", response_model=Workout)

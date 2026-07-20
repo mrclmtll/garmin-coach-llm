@@ -10,13 +10,16 @@ interface Props {
   onLoad: (id: number, workout: Workout) => void;
   // Currently-loaded workout id, for highlighting the active row.
   activeId: number | null;
+  // Expand/collapse is controlled by the parent so it can size this pane
+  // relative to its sibling (GarminWorkouts).
+  open: boolean;
+  onToggle: () => void;
 }
 
-export function SavedWorkouts({ refreshKey, onLoad, activeId }: Props) {
+export function SavedWorkouts({ refreshKey, onLoad, activeId, open, onToggle }: Props) {
   const [items, setItems] = useState<WorkoutSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<number | null>(null);
-  const [open, setOpen] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,15 +51,13 @@ export function SavedWorkouts({ refreshKey, onLoad, activeId }: Props) {
 
   return (
     <section
-      className={`card flex flex-col overflow-hidden p-0 ${
-        open ? "h-[calc(100vh-10rem)]" : "h-auto"
-      }`}
+      className={`card flex min-h-0 flex-col overflow-hidden p-0 ${open ? "flex-1" : "flex-none"}`}
     >
       <button
         type="button"
         className="sticky top-0 z-10 flex w-full items-center gap-2 rounded-t-xl border-b border-slate-800 bg-surface-800 px-4 py-3 text-left"
         aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
+        onClick={onToggle}
       >
         <span
           className={`inline-block text-slate-500 transition-transform ${open ? "rotate-90" : ""}`}
