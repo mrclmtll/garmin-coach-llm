@@ -11,6 +11,8 @@ import { GarminWorkouts } from "../components/GarminWorkouts";
 import { RepeatBlockView } from "../components/RepeatBlockView";
 import { SavedWorkouts } from "../components/SavedWorkouts";
 import { StepCard } from "../components/StepCard";
+import { Toasts } from "../components/Toasts";
+import { useToasts } from "../hooks/useToasts";
 
 type Mode = "free_text" | "template";
 
@@ -42,12 +44,12 @@ export function WorkoutBuilder() {
   const [workoutId, setWorkoutId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pushInfo, setPushInfo] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   // Bumped after each successful generate/push so SavedWorkouts re-fetches.
   const [refreshKey, setRefreshKey] = useState(0);
   const [savedOpen, setSavedOpen] = useState(true);
   const [garminOpen, setGarminOpen] = useState(true);
+  const { toasts, pushToast } = useToasts();
 
   // Source recorded on first save — mirrors how the workout was produced.
   const sourceForMode = () => (mode === "free_text" ? "text" : "template");
@@ -55,7 +57,6 @@ export function WorkoutBuilder() {
   const generate = async () => {
     setLoading(true);
     setError(null);
-    setPushInfo(null);
     try {
       const fn = mode === "free_text" ? generateFromText : generateFromTemplate;
       const res = await fn(input);
@@ -87,11 +88,13 @@ export function WorkoutBuilder() {
 
   const save = async () => {
     if (!workout) return;
+    const wasExisting = workoutId != null;
     setLoading(true);
     setError(null);
     try {
       await persist();
       setRefreshKey((k) => k + 1);
+      pushToast(wasExisting ? `Updated workout "${workout.name}"` : "Saved to workouts");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -110,6 +113,7 @@ export function WorkoutBuilder() {
       setWorkoutId(res.id);
       setDirty(false);
       setRefreshKey((k) => k + 1);
+      pushToast("Saved as new workout");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -121,13 +125,11 @@ export function WorkoutBuilder() {
     if (!workout) return;
     setLoading(true);
     setError(null);
-    setPushInfo(null);
     try {
       const id = await persist();
-      const result = await pushWorkout(id);
-      const idPart = result.garmin_workout_id ? ` (Garmin id ${result.garmin_workout_id})` : "";
-      setPushInfo(`Pushed "${workout.name}"${idPart}.`);
+      await pushWorkout(id);
       setRefreshKey((k) => k + 1);
+      pushToast("Pushed to Garmin");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -140,7 +142,6 @@ export function WorkoutBuilder() {
     setWorkoutId(id);
     setDirty(false);
     setError(null);
-    setPushInfo(null);
   };
 
   // Mark dirty whenever the workout is edited after a generate/save.
@@ -198,6 +199,7 @@ export function WorkoutBuilder() {
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+      <Toasts toasts={toasts} />
       <div className="space-y-6">
         <section className="card space-y-3">
         <div className="flex gap-2">
@@ -273,7 +275,6 @@ export function WorkoutBuilder() {
               </button>
             )}
             {dirty && <span className="text-xs text-amber-400">Unsaved changes</span>}
-            {pushInfo && <p className="text-sm text-slate-300">{pushInfo}</p>}
             {workoutId !== null && <span className="ml-auto text-xs text-slate-500">Workout id: {workoutId}</span>}
           </div>
         </section>
