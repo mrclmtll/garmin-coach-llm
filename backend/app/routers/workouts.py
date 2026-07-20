@@ -74,9 +74,7 @@ def _persist(db: Session, workout: Workout, source: str) -> WorkoutRow:
     return row
 
 
-@router.post(
-    "/from-text", response_model=CreatedWorkout, status_code=status.HTTP_201_CREATED
-)
+@router.post("/from-text", response_model=CreatedWorkout, status_code=status.HTTP_201_CREATED)
 def create_from_text(
     req: FromTextRequest, db: Annotated[Session, Depends(get_db)]
 ) -> CreatedWorkout:
@@ -88,9 +86,7 @@ def create_from_text(
     return CreatedWorkout(id=row.id, workout=workout)
 
 
-@router.post(
-    "/from-template", response_model=CreatedWorkout, status_code=status.HTTP_201_CREATED
-)
+@router.post("/from-template", response_model=CreatedWorkout, status_code=status.HTTP_201_CREATED)
 def create_from_template(
     req: FromTemplateRequest, db: Annotated[Session, Depends(get_db)]
 ) -> CreatedWorkout:
@@ -104,9 +100,7 @@ def create_from_template(
 
 @router.get("", response_model=list[WorkoutSummary])
 def list_workouts(db: Annotated[Session, Depends(get_db)]) -> list[WorkoutSummary]:
-    rows = db.execute(
-        select(WorkoutRow).order_by(WorkoutRow.created_at.desc())
-    ).scalars().all()
+    rows = db.execute(select(WorkoutRow).order_by(WorkoutRow.created_at.desc())).scalars().all()
     return [
         WorkoutSummary(
             id=r.id,

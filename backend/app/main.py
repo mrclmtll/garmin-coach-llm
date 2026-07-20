@@ -27,9 +27,7 @@ def create_app() -> FastAPI:
         inbound = request.headers.get("X-Request-Id")
         rid = inbound or new_request_id()
         set_request_id(rid)
-        log.info(
-            "request started: %s %s", request.method, request.url.path
-        )
+        log.info("request started: %s %s", request.method, request.url.path)
         try:
             response = await call_next(request)
         except Exception:
@@ -38,7 +36,10 @@ def create_app() -> FastAPI:
         response.headers["X-Debug-Request-Id"] = rid
         log.info(
             "request finished: %s %s -> %s (id=%s)",
-            request.method, request.url.path, response.status_code, get_request_id(),
+            request.method,
+            request.url.path,
+            response.status_code,
+            get_request_id(),
         )
         return response
 

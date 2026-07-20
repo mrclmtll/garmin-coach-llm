@@ -1,4 +1,7 @@
-"""SQLAlchemy engine + session. Default is SQLite; DATABASE_URL drives everything (Postgres-ready)."""
+"""SQLAlchemy engine + session.
+
+Default is SQLite; DATABASE_URL drives everything (Postgres-ready).
+"""
 
 from __future__ import annotations
 

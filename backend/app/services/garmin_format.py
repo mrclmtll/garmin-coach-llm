@@ -37,6 +37,7 @@ from garminconnect.workout import (
     create_repeat_group,
 )
 
+from app.logging_context import get_logger
 from app.schemas.workout import (
     Goal,
     HRZone,
@@ -48,7 +49,6 @@ from app.schemas.workout import (
     StepRole,
     Workout,
 )
-from app.logging_context import get_logger
 
 log = get_logger(__name__)
 
@@ -122,6 +122,7 @@ def _target_dict_and_values(
 
 # ---- duration estimation --------------------------------------------------
 
+
 def _default_speed_m_per_s(sport: Sport) -> float:
     """Default speed (m/s) when Goal.distance has no pace/power target."""
     if sport == Sport.CYCLING:
@@ -130,7 +131,9 @@ def _default_speed_m_per_s(sport: Sport) -> float:
     return 1000 / pace
 
 
-def _estimate_duration_seconds(goal: Goal, target: PaceRange | PowerRange | HRZone, sport: Sport) -> float:
+def _estimate_duration_seconds(
+    goal: Goal, target: PaceRange | PowerRange | HRZone, sport: Sport
+) -> float:
     if goal.kind == "time":
         return float(goal.value)
     # distance in meters
@@ -230,6 +233,7 @@ def _steps_to_executables(
 
 
 # ---- segment assembly -----------------------------------------------------
+
 
 def _build_segment(workout: Workout) -> WorkoutSegment:
     meta = _SPORT_META[workout.sport]

@@ -8,7 +8,7 @@ Garmin-specific types are intentionally absent here — that conversion lives in
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Annotated, Any, Literal, Union
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
@@ -58,7 +58,7 @@ class HRZone(BaseModel):
     zone: int = Field(ge=1, le=5)
 
 
-Target = Annotated[Union[PaceRange, PowerRange, HRZone], Field(discriminator="kind")]
+Target = Annotated[PaceRange | PowerRange | HRZone, Field(discriminator="kind")]
 
 
 class Step(BaseModel):
@@ -80,7 +80,7 @@ class RepeatBlock(BaseModel):
     steps: list[Step] = Field(min_length=1)
 
 
-BodyItem = Annotated[Union[Step, RepeatBlock], Field(discriminator="kind")]
+BodyItem = Annotated[Step | RepeatBlock, Field(discriminator="kind")]
 
 
 class Workout(BaseModel):

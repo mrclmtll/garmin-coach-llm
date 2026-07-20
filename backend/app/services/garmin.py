@@ -27,9 +27,7 @@ def _get_client() -> Garmin:
         return _client
 
     if not settings.garmin_email or not settings.garmin_password:
-        raise RuntimeError(
-            "GARMIN_EMAIL and GARMIN_PASSWORD must be set in the environment"
-        )
+        raise RuntimeError("GARMIN_EMAIL and GARMIN_PASSWORD must be set in the environment")
 
     # garminconnect reads/writes tokens at this path so subsequent logins
     # don't require MFA / interactive auth.
@@ -53,11 +51,9 @@ def push_workout(workout: Workout) -> dict[str, Any]:
     garmin_workout = to_garmin_workout(workout)
     log.info(
         "garmin push: sport=%s name=%r steps=%d",
-        workout.sport.value, workout.name,
-        sum(
-            1 if item.kind == "step" else 1 + len(item.steps)
-            for item in workout.body
-        ),
+        workout.sport.value,
+        workout.name,
+        sum(1 if item.kind == "step" else 1 + len(item.steps) for item in workout.body),
     )
     try:
         if workout.sport == Sport.RUNNING:

@@ -87,7 +87,9 @@ def _log_messages(messages: list[dict[str, str]]) -> None:
     for i, m in enumerate(messages):
         log.debug(
             "  msg[%d] role=%s content=%s",
-            i, m["role"], _truncate(m["content"]),
+            i,
+            m["role"],
+            _truncate(m["content"]),
         )
 
 
@@ -103,7 +105,10 @@ def generate_workout(*, mode: str, user_text: str) -> Workout:
 
     log.info(
         "llm.generate_workout start: mode=%s model=%s max_attempts=%d user_text=%r",
-        mode, settings.ollama_model, max_attempts, _truncate(user_text, 1000),
+        mode,
+        settings.ollama_model,
+        max_attempts,
+        _truncate(user_text, 1000),
     )
     log.debug("full message stack sent to Ollama (%d messages):", len(messages))
     _log_messages(messages)
@@ -126,11 +131,10 @@ def generate_workout(*, mode: str, user_text: str) -> Workout:
             if workout is not None:
                 log.info(
                     "llm.generate_workout ok: mode=%s attempt=%d name=%r steps=%d",
-                    mode, attempt, workout.name,
-                    sum(
-                        1 if item.kind == "step" else 1 + len(item.steps)
-                        for item in workout.body
-                    ),
+                    mode,
+                    attempt,
+                    workout.name,
+                    sum(1 if item.kind == "step" else 1 + len(item.steps) for item in workout.body),
                 )
                 log.debug("parsed workout JSON: %s", _truncate(json.dumps(parsed_obj)))
                 return workout
@@ -138,7 +142,10 @@ def generate_workout(*, mode: str, user_text: str) -> Workout:
             last_error = err
             log.warning(
                 "llm validation failed: mode=%s attempt=%d/%d error=%s",
-                mode, attempt, max_attempts, err,
+                mode,
+                attempt,
+                max_attempts,
+                err,
             )
             if parsed_obj is not None:
                 log.debug("offending parsed JSON: %s", _truncate(json.dumps(parsed_obj)))
@@ -149,7 +156,9 @@ def generate_workout(*, mode: str, user_text: str) -> Workout:
 
     log.error(
         "llm.generate_workout exhausted retries: mode=%s attempts=%d last_error=%s",
-        mode, max_attempts, last_error,
+        mode,
+        max_attempts,
+        last_error,
     )
     raise WorkoutGenerationError(
         f"Model failed to produce a valid Workout after {max_attempts} attempts. "

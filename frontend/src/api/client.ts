@@ -2,18 +2,33 @@ import type { Workout, WorkoutSummary } from "./types";
 
 const BASE = "/api"; // proxied to backend in dev
 
-async function jsonOrThrow<T>(res: Response): Promise<T> {
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly kind: "network" | "http",
+    readonly status?: number,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, init);
+  } catch {
+    throw new ApiError("Backend nicht erreichbar", "network");
+  }
   const requestId = res.headers.get("X-Debug-Request-Id");
   if (requestId) {
-    // Surfaced to the browser console so you can grep `logs/garmin-coach.log`
-    // for the full LLM trace of the request that just produced this response.
     // eslint-disable-next-line no-console
     console.debug(`[garmin-coach] request id: ${requestId} (${res.url} -> ${res.status})`);
   }
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}));
     const message = (detail as { detail?: string }).detail ?? `HTTP ${res.status}`;
-    throw new Error(requestId ? `${message} (request ${requestId})` : message);
+    throw new ApiError(message, "http", res.status);
   }
   return (await res.json()) as T;
 }
@@ -24,43 +39,37 @@ export interface CreatedWorkout {
 }
 
 export async function generateFromText(text: string): Promise<CreatedWorkout> {
-  const res = await fetch(`${BASE}/workouts/from-text`, {
+  return request<CreatedWorkout>("/workouts/from-text", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text }),
   });
-  return jsonOrThrow<CreatedWorkout>(res);
 }
 
 export async function generateFromTemplate(text: string): Promise<CreatedWorkout> {
-  const res = await fetch(`${BASE}/workouts/from-template`, {
+  return request<CreatedWorkout>("/workouts/from-template", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text }),
   });
-  return jsonOrThrow<CreatedWorkout>(res);
 }
 
 export async function pushWorkout(id: number): Promise<{ workout_id: number; garmin_workout_id: string | null; raw: unknown }> {
-  const res = await fetch(`${BASE}/workouts/${id}/push`, { method: "POST" });
-  return jsonOrThrow(res);
+  return request(`/workouts/${id}/push`, { method: "POST" });
 }
 
 export async function saveWorkout(id: number, workout: Workout): Promise<Workout> {
-  const res = await fetch(`${BASE}/workouts/${id}`, {
+  return request<Workout>(`/workouts/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(workout),
   });
-  return jsonOrThrow<Workout>(res);
 }
 
 export async function listWorkouts(): Promise<WorkoutSummary[]> {
-  const res = await fetch(`${BASE}/workouts`);
-  return jsonOrThrow<WorkoutSummary[]>(res);
+  return request<WorkoutSummary[]>("/workouts");
 }
 
 export async function getWorkout(id: number): Promise<Workout> {
-  const res = await fetch(`${BASE}/workouts/${id}`);
-  return jsonOrThrow<Workout>(res);
+  return request<Workout>(`/workouts/${id}`);
 }

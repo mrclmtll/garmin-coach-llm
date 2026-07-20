@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import DateTime, Integer, String
+from sqlalchemy import Integer, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import JSON, TypeDecorator
@@ -38,7 +38,8 @@ class WorkoutRow(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     sport: Mapped[str] = mapped_column(String(32), nullable=False)
-    source: Mapped[str] = mapped_column(String(32), nullable=False)  # "text" | "template" | "manual"
+    # "text" | "template" | "manual"
+    source: Mapped[str] = mapped_column(String(32), nullable=False)
     payload: Mapped[dict[str, Any]] = mapped_column(PortableJSON, nullable=False)
     pushed_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
     garmin_workout_id: Mapped[str | None] = mapped_column(String(64), nullable=True)

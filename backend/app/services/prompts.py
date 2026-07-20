@@ -36,8 +36,10 @@ SCHEMA_DESCRIPTION: str = dedent(
         "goal":  { "kind": "time" | "distance", "value": <number> },
                  // value is seconds when kind=time, meters when kind=distance
         "target":
-          { "kind": "pace",    "min_sec_per_km": <sec>, "max_sec_per_km": <sec> }   // running, swimming
-          | { "kind": "power",  "min_watts": <w>, "max_watts": <w> }                  // cycling
+          { "kind": "pace",    "min_sec_per_km": <sec>, "max_sec_per_km": <sec> }
+              // running, swimming
+          | { "kind": "power",  "min_watts": <w>, "max_watts": <w> }
+              // cycling
           | { "kind": "hr_zone","zone": 1|2|3|4|5 },
         "role": "warmup" | "work" | "recovery" | "cooldown",
         "sport": "running" | "cycling" | "swimming"

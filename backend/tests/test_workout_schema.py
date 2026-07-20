@@ -51,20 +51,24 @@ def test_invalid_target_for_sport_is_rejected_by_schema() -> None:
     bad = {
         "name": "x",
         "sport": "running",
-        "body": [{
-            "kind": "step", "label": "x",
-            "goal": {"kind": "time", "value": 60},
-            "target": {"kind": "watts_per_kg", "min": 1, "max": 2},
-            "role": "work", "sport": "running",
-        }],
+        "body": [
+            {
+                "kind": "step",
+                "label": "x",
+                "goal": {"kind": "time", "value": 60},
+                "target": {"kind": "watts_per_kg", "min": 1, "max": 2},
+                "role": "work",
+                "sport": "running",
+            }
+        ],
     }
     with pytest.raises(ValidationError):
         Workout.model_validate(bad)
 
 
 def test_distance_goal_with_pace_target_estimates_duration() -> None:
+    from app.schemas.workout import Goal, HRZone, PaceRange, Sport
     from app.services.garmin_format import _estimate_duration_seconds
-    from app.schemas.workout import Goal, HRZone, PaceRange, Sport, StepRole, Target
 
     # 1000m at 4:00/km (240 sec/km => 0.24 sec/m => 240s)
     sec = _estimate_duration_seconds(
