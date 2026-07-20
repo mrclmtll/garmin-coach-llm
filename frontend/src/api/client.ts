@@ -1,4 +1,4 @@
-import type { Workout } from "./types";
+import type { Workout, WorkoutSummary } from "./types";
 
 const BASE = "/api"; // proxied to backend in dev
 
@@ -52,5 +52,15 @@ export async function saveWorkout(id: number, workout: Workout): Promise<Workout
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(workout),
   });
+  return jsonOrThrow<Workout>(res);
+}
+
+export async function listWorkouts(): Promise<WorkoutSummary[]> {
+  const res = await fetch(`${BASE}/workouts`);
+  return jsonOrThrow<WorkoutSummary[]>(res);
+}
+
+export async function getWorkout(id: number): Promise<Workout> {
+  const res = await fetch(`${BASE}/workouts/${id}`);
   return jsonOrThrow<Workout>(res);
 }

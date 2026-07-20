@@ -37,3 +37,14 @@ export interface Workout {
   body: BodyItem[];
   cooldown: Step | null;
 }
+
+// Lightweight row for the saved-workouts list — backend GET /workouts.
+export interface WorkoutSummary {
+  id: number;
+  name: string;
+  sport: Sport;
+  source: string;
+  created_at: string;
+  pushed_at: string | null;
+  garmin_workout_id: string | null;
+}

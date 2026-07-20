@@ -17,6 +17,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import JSON, TypeDecorator
 
 from app.db import Base
+from app.db_types import TZDateTime
 
 
 class PortableJSON(TypeDecorator):
@@ -39,13 +40,13 @@ class WorkoutRow(Base):
     sport: Mapped[str] = mapped_column(String(32), nullable=False)
     source: Mapped[str] = mapped_column(String(32), nullable=False)  # "text" | "template" | "manual"
     payload: Mapped[dict[str, Any]] = mapped_column(PortableJSON, nullable=False)
-    pushed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    pushed_at: Mapped[datetime | None] = mapped_column(TZDateTime, nullable=True)
     garmin_workout_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
+        TZDateTime, nullable=False, default=lambda: datetime.now(UTC)
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        TZDateTime,
         nullable=False,
         default=lambda: datetime.now(UTC),
         onupdate=lambda: datetime.now(UTC),

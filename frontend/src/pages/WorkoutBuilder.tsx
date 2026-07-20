@@ -2,7 +2,9 @@ import { useState } from "react";
 import { generateFromTemplate, generateFromText, pushWorkout, saveWorkout } from "../api/client";
 import type { Step, Workout } from "../api/types";
 import { RepeatBlockView } from "../components/RepeatBlockView";
+import { SavedWorkouts } from "../components/SavedWorkouts";
 import { StepCard } from "../components/StepCard";
+import { useSidebarOpen } from "../hooks/useSidebarOpen";
 
 type Mode = "free_text" | "template";
 
@@ -36,6 +38,9 @@ export function WorkoutBuilder() {
   const [error, setError] = useState<string | null>(null);
   const [pushInfo, setPushInfo] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
+  // Bumped after each successful generate/push so SavedWorkouts re-fetches.
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [sidebarOpen] = useSidebarOpen();
 
   const generate = async () => {
     setLoading(true);
@@ -47,6 +52,7 @@ export function WorkoutBuilder() {
       setWorkout(res.workout);
       setWorkoutId(res.id);
       setDirty(false);
+      setRefreshKey((k) => k + 1);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -67,11 +73,20 @@ export function WorkoutBuilder() {
       const result = await pushWorkout(workoutId);
       const idPart = result.garmin_workout_id ? ` (Garmin id ${result.garmin_workout_id})` : "";
       setPushInfo(`Pushed "${workout.name}"${idPart}.`);
+      setRefreshKey((k) => k + 1);
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadWorkout = (id: number, w: Workout) => {
+    setWorkout(w);
+    setWorkoutId(id);
+    setDirty(false);
+    setError(null);
+    setPushInfo(null);
   };
 
   // Mark dirty whenever the workout is edited after a generate/save.
@@ -128,8 +143,9 @@ export function WorkoutBuilder() {
   };
 
   return (
-    <div className="space-y-6">
-      <section className="card space-y-3">
+    <div className={sidebarOpen ? "lg:pr-[344px]" : ""}>
+      <div className="space-y-6">
+        <section className="card space-y-3">
         <div className="flex gap-2">
           <button
             className={mode === "free_text" ? "btn-primary" : "btn-ghost"}
@@ -200,9 +216,29 @@ export function WorkoutBuilder() {
           </div>
         </section>
       )}
+      </div>
+      {sidebarOpen && (
+        <aside className="hidden lg:block fixed right-4 top-24 w-[320px] max-h-[calc(100vh-7rem)] overflow-y-auto">
+          <SavedWorkouts refreshKey={refreshKey} activeId={workoutId} onLoad={loadWorkout} />
+        </aside>
+      )}
     </div>
   );
 }
+
+WorkoutBuilder.SidebarToggle = function SidebarToggle() {
+  const [open, setOpen] = useSidebarOpen();
+  return (
+    <button
+      type="button"
+      className="btn-ghost shrink-0"
+      aria-expanded={open}
+      onClick={() => setOpen((v: boolean) => !v)}
+    >
+      {open ? "▸ Hide saved" : "◂ Show saved"}
+    </button>
+  );
+};
 
 function blankStep(sport: Workout["sport"], role: Step["role"]): Step {
   return {

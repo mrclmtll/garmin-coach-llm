@@ -11,6 +11,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -42,6 +43,18 @@ class PushResponse(BaseModel):
     workout_id: int
     garmin_workout_id: str | None
     raw: dict
+
+
+class WorkoutSummary(BaseModel):
+    """Lightweight row for the saved-workouts list — no full payload."""
+
+    id: int
+    name: str
+    sport: str
+    source: str
+    created_at: datetime
+    pushed_at: datetime | None
+    garmin_workout_id: str | None
 
 
 def _row_to_workout(row: WorkoutRow) -> Workout:
@@ -87,6 +100,25 @@ def create_from_template(
         raise HTTPException(status_code=422, detail=str(e)) from e
     row = _persist(db, workout, source="template")
     return CreatedWorkout(id=row.id, workout=workout)
+
+
+@router.get("", response_model=list[WorkoutSummary])
+def list_workouts(db: Annotated[Session, Depends(get_db)]) -> list[WorkoutSummary]:
+    rows = db.execute(
+        select(WorkoutRow).order_by(WorkoutRow.created_at.desc())
+    ).scalars().all()
+    return [
+        WorkoutSummary(
+            id=r.id,
+            name=r.name,
+            sport=r.sport,
+            source=r.source,
+            created_at=r.created_at,
+            pushed_at=r.pushed_at,
+            garmin_workout_id=r.garmin_workout_id,
+        )
+        for r in rows
+    ]
 
 
 @router.get("/{workout_id}", response_model=Workout)
