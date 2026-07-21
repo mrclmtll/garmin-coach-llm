@@ -57,3 +57,16 @@ export interface GarminWorkoutSummary {
   created_at: string | null;
   updated_at: string | null;
 }
+
+// A predefined starting-point workout shown in the Templates gallery —
+// backend GET /workout-templates. Built-in templates are seeded into the DB
+// on startup; new ones can be added there without a frontend change.
+export interface WorkoutTemplate {
+  id: string;
+  name: string;
+  category: string;
+  structure: string;
+  intensity: string;
+  purpose: string;
+  workout: Workout;
+}

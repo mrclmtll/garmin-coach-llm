@@ -6,6 +6,24 @@
   body {
     @apply font-sans antialiased;
   }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: theme("colors.slate.600") transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: theme("colors.slate.600");
+    border-radius: 9999px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: theme("colors.slate.500");
+  }
 }
 
 @layer components {
