@@ -1,41 +1,22 @@
 import { useState } from "react";
 import {
   createWorkout,
-  generateFromTemplate,
   generateFromText,
   pushWorkout,
   saveWorkout,
 } from "../api/client";
-import type { Step, Workout } from "../api/types";
+import type { Step, Workout, WorkoutTemplate } from "../api/types";
 import { GarminWorkouts } from "../components/GarminWorkouts";
 import { RepeatBlockView } from "../components/RepeatBlockView";
 import { SavedWorkouts } from "../components/SavedWorkouts";
 import { StepCard } from "../components/StepCard";
+import { TemplateGallery } from "../components/TemplateGallery";
 import { Toasts } from "../components/Toasts";
 import { useToasts } from "../hooks/useToasts";
 
-type Mode = "free_text" | "template";
+type Mode = "free_text" | "templates";
 
 const SAMPLE_FREE_TEXT = "6x800m Intervalle bei 4:10/km, 400m Trabpause. 10 min Warmup, 5 min Cooldown.";
-const SAMPLE_TEMPLATE = JSON.stringify(
-  {
-    name: "Classic 5x1000",
-    sport: "running",
-    warmup: { kind: "step", label: "Warmup", goal: { kind: "time", value: 600 }, target: { kind: "pace", min_sec_per_km: 360, max_sec_per_km: 330 }, role: "warmup", sport: "running" },
-    body: [
-      {
-        kind: "repeat", count: 5,
-        steps: [
-          { kind: "step", label: "1000m", goal: { kind: "distance", value: 1000 }, target: { kind: "pace", min_sec_per_km: 255, max_sec_per_km: 245 }, role: "work", sport: "running" },
-          { kind: "step", label: "Recovery", goal: { kind: "distance", value: 400 }, target: { kind: "pace", min_sec_per_km: 360, max_sec_per_km: 330 }, role: "recovery", sport: "running" },
-        ],
-      },
-    ],
-    cooldown: { kind: "step", label: "Cooldown", goal: { kind: "time", value: 300 }, target: { kind: "hr_zone", zone: 2 }, role: "cooldown", sport: "running" },
-  },
-  null,
-  2,
-);
 
 export function WorkoutBuilder() {
   const [mode, setMode] = useState<Mode>("free_text");
@@ -58,8 +39,7 @@ export function WorkoutBuilder() {
     setLoading(true);
     setError(null);
     try {
-      const fn = mode === "free_text" ? generateFromText : generateFromTemplate;
-      const res = await fn(input);
+      const res = await generateFromText(input);
       setWorkout(res.workout);
       setWorkoutId(null);
       setDirty(true);
@@ -68,6 +48,15 @@ export function WorkoutBuilder() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const selectTemplate = (tpl: WorkoutTemplate) => {
+    // Deep-cloned so re-selecting the same template never shares references
+    // with a previously-loaded, since-edited workout.
+    setWorkout(JSON.parse(JSON.stringify(tpl.workout)));
+    setWorkoutId(null);
+    setDirty(true);
+    setError(null);
   };
 
   // Persists the current workout: creates it on first save, updates it after.
@@ -200,30 +189,36 @@ export function WorkoutBuilder() {
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
       <Toasts toasts={toasts} />
-      <div className="space-y-6">
+      <div className="min-w-0 space-y-6">
         <section className="card space-y-3">
         <div className="flex gap-2">
           <button
             className={mode === "free_text" ? "btn-primary" : "btn-ghost"}
-            onClick={() => { setMode("free_text"); setInput(SAMPLE_FREE_TEXT); }}
+            onClick={() => setMode("free_text")}
           >Free text</button>
           <button
-            className={mode === "template" ? "btn-primary" : "btn-ghost"}
-            onClick={() => { setMode("template"); setInput(SAMPLE_TEMPLATE); }}
-          >Template / JSON</button>
+            className={mode === "templates" ? "btn-primary" : "btn-ghost"}
+            onClick={() => setMode("templates")}
+          >Templates</button>
         </div>
-        <textarea
-          className="input min-h-[140px] font-mono text-xs"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          spellCheck={false}
-        />
-        <div className="flex items-center gap-3">
-          <button className="btn-primary" onClick={generate} disabled={loading || !input.trim()}>
-            {loading ? "Generating…" : "Generate workout"}
-          </button>
-          {error && <p className="text-sm text-red-400">{error}</p>}
-        </div>
+        {mode === "free_text" ? (
+          <>
+            <textarea
+              className="input min-h-[140px] font-mono text-xs"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              spellCheck={false}
+            />
+            <div className="flex items-center gap-3">
+              <button className="btn-primary" onClick={generate} disabled={loading || !input.trim()}>
+                {loading ? "Generating…" : "Generate workout"}
+              </button>
+              {error && <p className="text-sm text-red-400">{error}</p>}
+            </div>
+          </>
+        ) : (
+          <TemplateGallery onSelect={selectTemplate} />
+        )}
       </section>
 
       {workout && (
