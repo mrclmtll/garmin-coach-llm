@@ -1,7 +1,8 @@
 # Claude Code (local tooling, not for the repo)
 .claude/
-
 CLAUDE.md
+
+*.ipynb
 
 # Python
 __pycache__/

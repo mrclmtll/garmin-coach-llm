@@ -12,24 +12,10 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import Integer, String
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.types import JSON, TypeDecorator
 
 from app.db import Base
-from app.db_types import TZDateTime
-
-
-class PortableJSON(TypeDecorator):
-    """JSON column that uses JSONB on Postgres, JSON elsewhere (SQLite)."""
-
-    impl = JSON
-    cache_ok = True
-
-    def load_dialect_impl(self, dialect):  # type: ignore[override]
-        if dialect.name == "postgresql":
-            return dialect.type_descriptor(JSONB())
-        return dialect.type_descriptor(JSON())
+from app.db_types import PortableJSON, TZDateTime
 
 
 class WorkoutRow(Base):

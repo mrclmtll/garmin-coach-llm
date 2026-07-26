@@ -7,6 +7,8 @@ import {
 } from "../api/client";
 import type { Step, Workout, WorkoutTemplate } from "../api/types";
 import { GarminWorkouts } from "../components/GarminWorkouts";
+import type { PushTarget } from "../components/PushButton";
+import { PushButton } from "../components/PushButton";
 import { RepeatBlockView } from "../components/RepeatBlockView";
 import { SavedWorkouts } from "../components/SavedWorkouts";
 import { StepCard } from "../components/StepCard";
@@ -110,15 +112,20 @@ export function WorkoutBuilder() {
     }
   };
 
-  const push = async () => {
+  const push = async (target: PushTarget) => {
     if (!workout) return;
     setLoading(true);
     setError(null);
     try {
       const id = await persist();
-      await pushWorkout(id);
+      const deviceId = target.kind === "device" ? target.id : null;
+      await pushWorkout(id, deviceId);
       setRefreshKey((k) => k + 1);
-      pushToast("Pushed to Garmin");
+      pushToast(
+        target.kind === "device"
+          ? `Pushed to Garmin and queued to ${target.name}`
+          : "Pushed to Garmin Connect",
+      );
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -258,9 +265,7 @@ export function WorkoutBuilder() {
           )}
 
           <div className="sticky bottom-4 z-10 mx-6 flex items-center gap-3 rounded-xl border border-white/10 bg-surface-800/50 p-4 shadow-lg backdrop-blur-md">
-            <button className="btn-primary" onClick={push} disabled={loading}>
-              {loading ? "Pushing…" : "Push to Garmin"}
-            </button>
+            <PushButton loading={loading} onPush={push} />
             <button className="btn-ghost" onClick={save} disabled={loading || !dirty}>
               {loading ? "Saving…" : "Save"}
             </button>

@@ -15,9 +15,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.logging_context import get_logger
 from app.models.workout import WorkoutRow
 from app.schemas.workout import Workout
 from app.services import garmin, llm
+
+log = get_logger(__name__)
 
 router = APIRouter(prefix="/workouts", tags=["workouts"])
 
@@ -50,10 +53,23 @@ class CreatedWorkout(BaseModel):
     workout: Workout
 
 
+class PushRequest(BaseModel):
+    # None = upload to Garmin Connect only; set to also queue the workout to
+    # that specific device (see GET /workouts/devices for valid ids).
+    device_id: str | None = None
+
+
 class PushResponse(BaseModel):
     workout_id: int
     garmin_workout_id: str | None
+    queued_to_device: bool
     raw: dict
+
+
+class GarminDeviceSummary(BaseModel):
+    id: str
+    name: str
+    is_primary: bool
 
 
 class WorkoutSummary(BaseModel):
@@ -161,6 +177,17 @@ def list_garmin_workouts() -> list[GarminWorkoutSummary]:
     return [_map_garmin_workout(w) for w in raw]
 
 
+@router.get("/devices", response_model=list[GarminDeviceSummary])
+def list_garmin_devices() -> list[GarminDeviceSummary]:
+    try:
+        devices = garmin.list_devices()
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except Exception as e:  # garminconnect raises a variety of types
+        raise HTTPException(status_code=502, detail=f"garmin device fetch failed: {e}") from e
+    return [GarminDeviceSummary(**d) for d in devices]
+
+
 @router.get("/{workout_id}", response_model=Workout)
 def get_workout(workout_id: int, db: Annotated[Session, Depends(get_db)]) -> Workout:
     row = db.get(WorkoutRow, workout_id)
@@ -187,7 +214,11 @@ def update_workout(
 
 
 @router.post("/{workout_id}/push", response_model=PushResponse)
-def push_workout(workout_id: int, db: Annotated[Session, Depends(get_db)]) -> PushResponse:
+def push_workout(
+    workout_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    req: PushRequest | None = None,
+) -> PushResponse:
     row = db.get(WorkoutRow, workout_id)
     if row is None:
         raise HTTPException(status_code=404, detail="workout not found")
@@ -210,8 +241,26 @@ def push_workout(workout_id: int, db: Annotated[Session, Depends(get_db)]) -> Pu
     row.garmin_workout_id = garmin_id
     db.commit()
 
+    device_id = req.device_id if req else None
+    queued_to_device = False
+    if garmin_id is not None and device_id is not None:
+        try:
+            garmin.send_workout_to_device(garmin_workout_id=garmin_id, device_id=device_id)
+            queued_to_device = True
+        except Exception as e:
+            # The upload to Garmin Connect already succeeded and is committed
+            # above; only the explicit device queue step failed.
+            log.warning(
+                "could not queue workout %s to device %s", garmin_id, device_id, exc_info=True
+            )
+            raise HTTPException(
+                status_code=502,
+                detail=f"uploaded to Garmin Connect, but couldn't queue it to the device: {e}",
+            ) from e
+
     return PushResponse(
         workout_id=row.id,
         garmin_workout_id=garmin_id,
+        queued_to_device=queued_to_device,
         raw=result if isinstance(result, dict) else {"result": str(result)},
     )

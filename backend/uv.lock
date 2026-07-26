@@ -295,7 +295,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "garminconnect", version = "0.3.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
-    { name = "garminconnect", version = "0.3.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "garminconnect", version = "0.3.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "httpx" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
@@ -347,7 +347,7 @@ wheels = [
 
 [[package]]
 name = "garminconnect"
-version = "0.3.6"
+version = "0.3.7"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
     "python_full_version >= '3.12'",
@@ -357,9 +357,9 @@ dependencies = [
     { name = "requests", marker = "python_full_version >= '3.12'" },
     { name = "ua-generator", marker = "python_full_version >= '3.12'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/24/29/f8e3609f22693020dec65d6285adf12daac459461a09e59dffe12ec7fc08/garminconnect-0.3.6.tar.gz", hash = "sha256:6f90aa282976f7dff880cf53ef4f3ea0d63701fd2a1488c628a66a2a027c2143", size = 61911, upload-time = "2026-06-14T08:05:37.349Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/30/c5/bc236e1704e53980939ccff20c0802f288acff34e848e5bfc71e6a95a8b6/garminconnect-0.3.7.tar.gz", hash = "sha256:1c40ab3e0b07ab70510dad455d1924636bd02070f0664945e398400424e948c7", size = 90955, upload-time = "2026-07-26T06:29:18.655Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ab/f9/6d69eb2eab9f62ed7e415a606c5ef63e19f27e561d15d7ac7d651997cfad/garminconnect-0.3.6-py3-none-any.whl", hash = "sha256:e05782ab90e63cb9c023407899e2d12dd18132316fd84394ebecd393809d4ffe", size = 57555, upload-time = "2026-06-14T08:05:36.027Z" },
+    { url = "https://files.pythonhosted.org/packages/8e/16/c531e66e176570d0088be0cb7db30d9886ac0cdd9187872d00a4243625c4/garminconnect-0.3.7-py3-none-any.whl", hash = "sha256:a44137b663e08d7979ca1d497f444c6ca7a09197f991199c62aab124777b5983", size = 85155, upload-time = "2026-07-26T06:29:17.255Z" },
 ]
 
 [[package]]

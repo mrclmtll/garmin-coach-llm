@@ -1,6 +1,19 @@
 from datetime import UTC
 
-from sqlalchemy.types import DateTime, TypeDecorator
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.types import JSON, DateTime, TypeDecorator
+
+
+class PortableJSON(TypeDecorator):
+    """JSON column that uses JSONB on Postgres, JSON elsewhere (SQLite)."""
+
+    impl = JSON
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):  # type: ignore[override]
+        if dialect.name == "postgresql":
+            return dialect.type_descriptor(JSONB())
+        return dialect.type_descriptor(JSON())
 
 
 class TZDateTime(TypeDecorator):

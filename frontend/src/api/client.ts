@@ -1,4 +1,4 @@
-import type { GarminWorkoutSummary, Workout, WorkoutSummary, WorkoutTemplate } from "./types";
+import type { GarminDevice, GarminWorkoutSummary, Workout, WorkoutSummary, WorkoutTemplate } from "./types";
 
 const BASE = "/api"; // proxied to backend in dev
 
@@ -66,8 +66,19 @@ export async function createWorkout(workout: Workout, source: string): Promise<C
   });
 }
 
-export async function pushWorkout(id: number): Promise<{ workout_id: number; garmin_workout_id: string | null; raw: unknown }> {
-  return request(`/workouts/${id}/push`, { method: "POST" });
+export interface PushResult {
+  workout_id: number;
+  garmin_workout_id: string | null;
+  queued_to_device: boolean;
+  raw: unknown;
+}
+
+export async function pushWorkout(id: number, deviceId: string | null): Promise<PushResult> {
+  return request(`/workouts/${id}/push`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ device_id: deviceId }),
+  });
 }
 
 export async function saveWorkout(id: number, workout: Workout): Promise<Workout> {
@@ -88,6 +99,10 @@ export async function getWorkout(id: number): Promise<Workout> {
 
 export async function listGarminWorkouts(): Promise<GarminWorkoutSummary[]> {
   return request<GarminWorkoutSummary[]>("/workouts/garmin");
+}
+
+export async function listGarminDevices(): Promise<GarminDevice[]> {
+  return request<GarminDevice[]>("/workouts/devices");
 }
 
 export async function listWorkoutTemplates(): Promise<WorkoutTemplate[]> {

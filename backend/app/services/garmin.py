@@ -48,6 +48,63 @@ def list_workouts(start: int = 0, limit: int = 100) -> list[dict[str, Any]]:
     return client.get_workouts(start=start, limit=limit)
 
 
+def _get_primary_device_id(client: Garmin) -> str | None:
+    """Best-effort lookup of the account's primary training device id.
+
+    `garminconnect` doesn't document this endpoint's response shape, so we
+    check the nesting patterns Garmin's other device endpoints use rather
+    than assume one; any miss just means the frontend's dropdown won't have
+    a device pre-marked as primary, not a hard failure.
+    """
+    try:
+        raw = client.get_primary_training_device()
+    except Exception:
+        log.warning("could not fetch primary training device", exc_info=True)
+        return None
+    candidate = raw
+    if isinstance(raw, dict):
+        candidate = raw.get("device") or raw.get("primaryTrainingDevice") or raw
+    device_id = candidate.get("deviceId") if isinstance(candidate, dict) else None
+    return str(device_id) if device_id is not None else None
+
+
+def list_devices() -> list[dict[str, Any]]:
+    """List every device registered on this account as {id, name, is_primary}.
+
+    Ordered primary-first, then alphabetically by name — the order the
+    frontend's push dropdown shows them in.
+    """
+    client = _get_client()
+    raw_devices = client.get_devices()
+    primary_id = _get_primary_device_id(client)
+
+    entries = []
+    for d in raw_devices:
+        device_id = str(d.get("deviceId"))
+        name = d.get("displayName") or d.get("deviceName") or f"Device {device_id}"
+        entries.append({"id": device_id, "name": name, "is_primary": device_id == primary_id})
+
+    primary = [e for e in entries if e["is_primary"]]
+    rest = sorted((e for e in entries if not e["is_primary"]), key=lambda e: e["name"].lower())
+    return primary + rest
+
+
+def send_workout_to_device(*, garmin_workout_id: str, device_id: str) -> dict[str, Any]:
+    """Queue an already-uploaded workout for delivery to a specific device.
+
+    Delegates to garminconnect's own `push_workout_to_device` (0.3.7+) — it
+    mirrors the request Garmin Connect's web UI makes when you click "Send to
+    Device": it doesn't push bytes directly, it queues a message the watch
+    picks up next time it syncs (Bluetooth via Connect Mobile, or USB via
+    Garmin Express).
+    """
+    client = _get_client()
+    log.info("queuing workout %s for device %s", garmin_workout_id, device_id)
+    raw = client.push_workout_to_device(workout_id=garmin_workout_id, device_id=device_id)
+    log.info("device queue ok: workout=%s device=%s", garmin_workout_id, device_id)
+    return {"raw": raw}
+
+
 def push_workout(workout: Workout) -> dict[str, Any]:
     """Translate to the garminconnect workout model and upload it.
 

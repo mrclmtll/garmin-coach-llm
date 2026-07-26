@@ -58,6 +58,13 @@ export interface GarminWorkoutSummary {
   updated_at: string | null;
 }
 
+// A device registered on the Garmin account — backend GET /workouts/devices.
+export interface GarminDevice {
+  id: string;
+  name: string;
+  is_primary: boolean;
+}
+
 // A predefined starting-point workout shown in the Templates gallery —
 // backend GET /workout-templates. Built-in templates are seeded into the DB
 // on startup; new ones can be added there without a frontend change.

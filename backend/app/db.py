@@ -34,6 +34,6 @@ def get_db() -> Iterator[Session]:
 
 
 def init_db() -> None:
-    from app.models import workout  # noqa: F401  (register tables)
+    from app.models import workout, workout_template  # noqa: F401  (register tables)
 
     Base.metadata.create_all(bind=engine)
