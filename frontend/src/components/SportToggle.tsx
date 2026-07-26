@@ -1,21 +1,5 @@
 import type { Sport } from "../api/types";
-import cyclingIcon from "../assets/icons/cycling.svg?raw";
-import runningIcon from "../assets/icons/running.svg?raw";
-import swimmingIcon from "../assets/icons/swimming.svg?raw";
-
-// Swap an icon by replacing its file in src/assets/icons/ — any SVG using
-// fill="currentColor" and a 0 0 24 24 viewBox will pick up sizing and color.
-const ICONS: Record<Sport, string> = {
-  running: runningIcon,
-  cycling: cyclingIcon,
-  swimming: swimmingIcon,
-};
-
-const LABELS: Record<Sport, string> = {
-  running: "Running",
-  cycling: "Cycling",
-  swimming: "Swimming",
-};
+import { SPORT_ICONS, SPORT_LABELS } from "./SportIcon";
 
 const ORDER: Sport[] = ["running", "cycling", "swimming"];
 
@@ -33,11 +17,11 @@ export function SportToggle({ value, onChange }: Props) {
           type="button"
           role="radio"
           aria-checked={value === sport}
-          title={LABELS[sport]}
+          title={SPORT_LABELS[sport]}
           onClick={() => onChange(sport)}
           className={`sport-toggle-btn ${value === sport ? "sport-toggle-btn-active" : ""}`}
         >
-          <span className="sport-toggle-icon" dangerouslySetInnerHTML={{ __html: ICONS[sport] }} />
+          <span className="sport-toggle-icon" dangerouslySetInnerHTML={{ __html: SPORT_ICONS[sport] }} />
         </button>
       ))}
     </div>
