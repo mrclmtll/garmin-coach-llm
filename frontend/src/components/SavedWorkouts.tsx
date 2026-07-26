@@ -1,8 +1,17 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getWorkout, listWorkouts } from "../api/client";
 import { formatDateTime } from "../api/format";
 import type { Workout, WorkoutSummary } from "../api/types";
+import { usePolling } from "../hooks/usePolling";
 import { SportIcon } from "./SportIcon";
+
+// Keeps the list current without a manual refresh, and re-tries promptly
+// after a failed fetch or a stint in a background tab. While there's no data
+// yet (e.g. the backend hasn't come up) or the last fetch failed, poll much
+// faster so a slow/late-starting backend gets picked up within seconds
+// instead of waiting out the full interval.
+const POLL_INTERVAL_MS = 60_000;
+const RETRY_INTERVAL_MS = 3_000;
 
 interface Props {
   // Bumped after a generate/push so the list refreshes.
@@ -22,21 +31,30 @@ export function SavedWorkouts({ refreshKey, onLoad, activeId, open, onToggle }: 
   const [items, setItems] = useState<WorkoutSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<number | null>(null);
-
+  const mountedRef = useRef(true);
   useEffect(() => {
-    let cancelled = false;
-    setError(null);
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  const fetchItems = useCallback(() => {
     listWorkouts()
       .then((rows) => {
-        if (!cancelled) setItems(rows);
+        if (mountedRef.current) {
+          setItems(rows);
+          setError(null);
+        }
       })
       .catch((e: Error) => {
-        if (!cancelled) setError(e.message);
+        if (mountedRef.current) setError(e.message);
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [refreshKey]);
+  }, []);
+
+  useEffect(() => {
+    fetchItems();
+  }, [fetchItems, refreshKey]);
+
+  usePolling(fetchItems, items === null || error ? RETRY_INTERVAL_MS : POLL_INTERVAL_MS);
 
   const handleClick = async (id: number) => {
     setLoadingId(id);
