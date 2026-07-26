@@ -2,18 +2,16 @@
 
 from __future__ import annotations
 
-import logging
-
 from fastapi import FastAPI, Request
 
 from app.db import SessionLocal, init_db
 from app.logging_config import configure_logging
-from app.logging_context import get_request_id, new_request_id, set_request_id
+from app.logging_context import get_logger, get_request_id, new_request_id, set_request_id
 from app.routers import workout_templates, workouts
 from app.services.workout_templates import seed_workout_templates
 
 configure_logging()
-log = logging.getLogger(__name__)
+log = get_logger(__name__)
 
 
 def create_app() -> FastAPI:

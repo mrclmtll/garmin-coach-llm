@@ -18,6 +18,8 @@ import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
+from app.logging_context import RequestIdFilter
+
 _CONFIGURED = False
 
 
@@ -39,9 +41,12 @@ def configure_logging() -> None:
     fmt = "%(asctime)s %(levelname)-7s [%(request_id)s] %(name)s: %(message)s"
     formatter = logging.Formatter(fmt)
 
+    request_id_filter = RequestIdFilter()
+
     console = logging.StreamHandler(sys.stdout)
     console.setLevel(level)
     console.setFormatter(formatter)
+    console.addFilter(request_id_filter)
 
     log_path = Path(os.getenv("LOG_FILE", "logs/garmin-coach.log"))
     max_bytes = int(os.getenv("LOG_MAX_BYTES", str(5 * 1024 * 1024)))
@@ -52,6 +57,7 @@ def configure_logging() -> None:
     )
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter)
+    file_handler.addFilter(request_id_filter)
 
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)

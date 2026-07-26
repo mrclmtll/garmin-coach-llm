@@ -41,3 +41,17 @@ class RequestIdAdapter(logging.LoggerAdapter):
 
 def get_logger(name: str) -> RequestIdAdapter:
     return RequestIdAdapter(logging.getLogger(name), {})
+
+
+class RequestIdFilter(logging.Filter):
+    """Backstop for loggers that don't go through `get_logger` — third-party
+    dependencies (e.g. garminconnect, garth, httpx) use plain stdlib loggers
+    that propagate straight to the root handlers. Without this, any record
+    reaching those handlers without a `request_id` attribute crashes the
+    formatter (`%(request_id)s` has nothing to fill in).
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if not hasattr(record, "request_id"):
+            record.request_id = get_request_id()
+        return True
