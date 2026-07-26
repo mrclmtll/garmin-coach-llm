@@ -97,20 +97,33 @@ TEMPLATE_SYSTEM: str = (
 )
 
 
-def build_messages(*, mode: str, user_text: str) -> list[dict[str, str]]:
+def build_messages(*, mode: str, user_text: str, sport: str | None = None) -> list[dict[str, str]]:
     """Return a chat-format message list for Ollama.
 
-    `mode` is "free_text" or "template".
+    `mode` is "free_text" or "template". `sport`, if given, pins the target
+    sport instead of letting the model infer it from the text.
     """
     if mode not in {"free_text", "template"}:
         raise ValueError(f"unknown mode: {mode!r}")
 
     system = FREE_TEXT_SYSTEM if mode == "free_text" else TEMPLATE_SYSTEM
-    return [
+    messages = [
         {"role": "system", "content": system},
         {"role": "user", "content": _user_instructions()},
-        {"role": "user", "content": user_text},
     ]
+    if sport:
+        messages.append(
+            {
+                "role": "user",
+                "content": (
+                    f'Generate this workout for sport "{sport}". Set "sport" to '
+                    f'"{sport}" on the workout and on every step — do not infer a '
+                    "different sport from the text."
+                ),
+            }
+        )
+    messages.append({"role": "user", "content": user_text})
+    return messages
 
 
 def retry_message(error: str) -> str:

@@ -1,4 +1,4 @@
-import type { GarminDevice, GarminWorkoutSummary, Workout, WorkoutSummary, WorkoutTemplate } from "./types";
+import type { GarminDevice, GarminWorkoutSummary, Sport, Workout, WorkoutSummary, WorkoutTemplate } from "./types";
 
 const BASE = "/api"; // proxied to backend in dev
 
@@ -42,19 +42,19 @@ export interface CreatedWorkout {
   workout: Workout;
 }
 
-export async function generateFromText(text: string): Promise<GeneratedWorkout> {
+export async function generateFromText(text: string, sport?: Sport): Promise<GeneratedWorkout> {
   return request<GeneratedWorkout>("/workouts/from-text", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, sport }),
   });
 }
 
-export async function generateFromTemplate(text: string): Promise<GeneratedWorkout> {
+export async function generateFromTemplate(text: string, sport?: Sport): Promise<GeneratedWorkout> {
   return request<GeneratedWorkout>("/workouts/from-template", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, sport }),
   });
 }
 

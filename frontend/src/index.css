@@ -48,6 +48,18 @@
   .toast {
     animation: toast-in 150ms ease-out;
   }
+  .sport-toggle {
+    @apply inline-flex items-center gap-1 rounded-full border border-slate-800 bg-surface-900 p-1;
+  }
+  .sport-toggle-btn {
+    @apply flex h-10 w-10 items-center justify-center rounded-full text-slate-500 transition-colors hover:text-slate-300;
+  }
+  .sport-toggle-btn-active {
+    @apply bg-accent-500 text-slate-900 shadow hover:text-slate-900;
+  }
+  .sport-toggle-icon {
+    @apply flex h-5 w-5 [&>svg]:h-full [&>svg]:w-full;
+  }
 }
 
 @keyframes toast-in {

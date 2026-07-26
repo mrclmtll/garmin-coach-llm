@@ -5,12 +5,13 @@ import {
   pushWorkout,
   saveWorkout,
 } from "../api/client";
-import type { Step, Workout, WorkoutTemplate } from "../api/types";
+import type { Sport, Step, Workout, WorkoutTemplate } from "../api/types";
 import { GarminWorkouts } from "../components/GarminWorkouts";
 import type { PushTarget } from "../components/PushButton";
 import { PushButton } from "../components/PushButton";
 import { RepeatBlockView } from "../components/RepeatBlockView";
 import { SavedWorkouts } from "../components/SavedWorkouts";
+import { SportToggle } from "../components/SportToggle";
 import { StepCard } from "../components/StepCard";
 import { TemplateGallery } from "../components/TemplateGallery";
 import { Toasts } from "../components/Toasts";
@@ -22,6 +23,7 @@ const SAMPLE_FREE_TEXT = "6x800m Intervalle bei 4:10/km, 400m Trabpause. 10 min 
 
 export function WorkoutBuilder() {
   const [mode, setMode] = useState<Mode>("free_text");
+  const [sport, setSport] = useState<Sport>("running");
   const [input, setInput] = useState<string>(SAMPLE_FREE_TEXT);
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [workoutId, setWorkoutId] = useState<number | null>(null);
@@ -41,7 +43,7 @@ export function WorkoutBuilder() {
     setLoading(true);
     setError(null);
     try {
-      const res = await generateFromText(input);
+      const res = await generateFromText(input, sport);
       setWorkout(res.workout);
       setWorkoutId(null);
       setDirty(true);
@@ -198,6 +200,7 @@ export function WorkoutBuilder() {
       <Toasts toasts={toasts} />
       <div className="min-w-0 space-y-6">
         <section className="card space-y-3">
+        <SportToggle value={sport} onChange={setSport} />
         <div className="flex gap-2">
           <button
             className={mode === "free_text" ? "btn-primary" : "btn-ghost"}
@@ -224,7 +227,7 @@ export function WorkoutBuilder() {
             </div>
           </>
         ) : (
-          <TemplateGallery onSelect={selectTemplate} />
+          <TemplateGallery sport={sport} onSelect={selectTemplate} />
         )}
       </section>
 

@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { listWorkoutTemplates } from "../api/client";
-import type { WorkoutTemplate } from "../api/types";
+import type { Sport, WorkoutTemplate } from "../api/types";
 
 interface Props {
+  sport: Sport;
   onSelect: (template: WorkoutTemplate) => void;
 }
 
-export function TemplateGallery({ onSelect }: Props) {
+export function TemplateGallery({ sport, onSelect }: Props) {
   const [templates, setTemplates] = useState<WorkoutTemplate[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,17 +26,19 @@ export function TemplateGallery({ onSelect }: Props) {
     };
   }, []);
 
+  const filtered = templates?.filter((tpl) => tpl.workout.sport === sport) ?? null;
+
   return (
     <div className="space-y-2">
       <p className="text-xs text-slate-500">Pick a starting point — you can edit every step after loading it.</p>
       {error && <p className="text-sm text-slate-400">Templates could not be loaded</p>}
-      {templates === null && !error && <p className="text-sm text-slate-500">Loading…</p>}
-      {templates && templates.length === 0 && (
-        <p className="text-sm text-slate-500">No templates available yet.</p>
+      {filtered === null && !error && <p className="text-sm text-slate-500">Loading…</p>}
+      {filtered && filtered.length === 0 && (
+        <p className="text-sm text-slate-500">No {sport} templates available yet.</p>
       )}
-      {templates && templates.length > 0 && (
+      {filtered && filtered.length > 0 && (
         <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory">
-          {templates.map((tpl) => (
+          {filtered.map((tpl) => (
             <button
               key={tpl.id}
               onClick={() => onSelect(tpl)}

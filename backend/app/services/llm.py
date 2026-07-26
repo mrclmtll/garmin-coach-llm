@@ -93,19 +93,21 @@ def _log_messages(messages: list[dict[str, str]]) -> None:
         )
 
 
-def generate_workout(*, mode: str, user_text: str) -> Workout:
+def generate_workout(*, mode: str, user_text: str, sport: str | None = None) -> Workout:
     """Generate a Workout from free text or a template.
 
     Validates the model's JSON output against the Workout schema. On failure,
     re-sends the error to the model and tries again, up to `ollama_max_retries`
-    total attempts.
+    total attempts. `sport`, if given, pins the target sport instead of
+    letting the model infer it from the text.
     """
-    messages = build_messages(mode=mode, user_text=user_text)
+    messages = build_messages(mode=mode, user_text=user_text, sport=sport)
     max_attempts = max(1, settings.ollama_max_retries)
 
     log.info(
-        "llm.generate_workout start: mode=%s model=%s max_attempts=%d user_text=%r",
+        "llm.generate_workout start: mode=%s sport=%s model=%s max_attempts=%d user_text=%r",
         mode,
+        sport,
         settings.ollama_model,
         max_attempts,
         _truncate(user_text, 1000),

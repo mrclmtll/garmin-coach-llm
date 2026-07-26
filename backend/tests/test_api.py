@@ -53,7 +53,7 @@ def test_from_text_returns_422_when_ollama_unreachable(
     from app.routers import workouts as workouts_router
     from app.services import llm
 
-    def _raise(*, mode, user_text):
+    def _raise(*, mode, user_text, sport=None):
         raise llm.WorkoutGenerationError("Ollama request failed: ConnectionError")
 
     monkeypatch.setattr(workouts_router.llm, "generate_workout", _raise)
@@ -85,7 +85,7 @@ def test_generate_from_text_does_not_persist(monkeypatch: pytest.MonkeyPatch) ->
     )
 
     class FakeLLM:
-        def generate_workout(self, *, mode, user_text):
+        def generate_workout(self, *, mode, user_text, sport=None):
             return fake_workout
 
     from app.services import llm

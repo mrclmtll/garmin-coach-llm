@@ -125,7 +125,7 @@ def _persist(db: Session, workout: Workout, source: str) -> WorkoutRow:
 @router.post("/from-text", response_model=GeneratedWorkout)
 def create_from_text(req: FromTextRequest) -> GeneratedWorkout:
     try:
-        workout = llm.generate_workout(mode="free_text", user_text=req.text)
+        workout = llm.generate_workout(mode="free_text", user_text=req.text, sport=req.sport)
     except llm.WorkoutGenerationError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     return GeneratedWorkout(workout=workout)
@@ -134,7 +134,7 @@ def create_from_text(req: FromTextRequest) -> GeneratedWorkout:
 @router.post("/from-template", response_model=GeneratedWorkout)
 def create_from_template(req: FromTemplateRequest) -> GeneratedWorkout:
     try:
-        workout = llm.generate_workout(mode="template", user_text=req.text)
+        workout = llm.generate_workout(mode="template", user_text=req.text, sport=req.sport)
     except llm.WorkoutGenerationError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
     return GeneratedWorkout(workout=workout)
