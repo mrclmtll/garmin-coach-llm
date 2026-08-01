@@ -1,4 +1,5 @@
 import type { RepeatBlock, Sport, Step } from "../api/types";
+import { dragHandleClassName, dragRowClassName, useDragReorder } from "../hooks/useDragReorder";
 import { blankStep } from "../lib/steps";
 import { StepCard } from "./StepCard";
 
@@ -16,6 +17,14 @@ export function RepeatBlockView({ block, sport, onChange, onRemove }: Props) {
     onChange({ ...block, steps: block.steps.filter((_, idx) => idx !== i) });
   const addStep = () =>
     onChange({ ...block, steps: [...block.steps, blankStep(sport, "work", "Work")] });
+  const moveStep = (from: number, to: number) => {
+    if (from === to) return;
+    const next = [...block.steps];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    onChange({ ...block, steps: next });
+  };
+  const { draggedIndex, dragOverIndex, startDrag } = useDragReorder("data-step-index", moveStep);
 
   return (
     <div className="card space-y-3 border-l-4 border-l-accent-500">
@@ -36,7 +45,25 @@ export function RepeatBlockView({ block, sport, onChange, onRemove }: Props) {
       </div>
       <div className="space-y-3 pl-2">
         {block.steps.map((s, i) => (
-          <StepCard key={i} step={s} onChange={(next) => updateStep(i, next)} onRemove={() => removeStep(i)} />
+          <div
+            key={i}
+            data-step-index={i}
+            className={dragRowClassName(draggedIndex === i, dragOverIndex === i && draggedIndex !== null && draggedIndex !== i)}
+          >
+            <div
+              onMouseDown={(e) => {
+                e.preventDefault();
+                startDrag(i, e);
+              }}
+              className={dragHandleClassName}
+              aria-label="Drag to reorder"
+            >
+              ⠿
+            </div>
+            <div className="min-w-0 flex-1">
+              <StepCard step={s} onChange={(next) => updateStep(i, next)} onRemove={() => removeStep(i)} />
+            </div>
+          </div>
         ))}
         <button className="btn-ghost" onClick={addStep}>+ Add step</button>
       </div>

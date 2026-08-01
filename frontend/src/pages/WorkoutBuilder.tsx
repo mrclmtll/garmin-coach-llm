@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
   createWorkout,
   generateFromText,
@@ -16,6 +16,7 @@ import { SportToggle } from "../components/SportToggle";
 import { StepCard } from "../components/StepCard";
 import { TemplateGallery } from "../components/TemplateGallery";
 import { Toasts } from "../components/Toasts";
+import { dragHandleClassName, dragRowClassName, useDragReorder } from "../hooks/useDragReorder";
 import { useToasts } from "../hooks/useToasts";
 import { blankStep } from "../lib/steps";
 
@@ -36,8 +37,6 @@ export function WorkoutBuilder() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [savedOpen, setSavedOpen] = useState(true);
   const [garminOpen, setGarminOpen] = useState(true);
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const { toasts, pushToast } = useToasts();
 
   // Source recorded on first save — mirrors how the workout was produced.
@@ -194,83 +193,7 @@ export function WorkoutBuilder() {
     next.splice(to, 0, moved);
     mutate({ ...workout, body: next });
   };
-
-  // Custom mouse-driven drag instead of native HTML5 DnD: native drag
-  // requires the browser's own drag gesture to kick in, which is finicky
-  // to trigger reliably from a handle nested inside interactive elements
-  // (inputs/selects) and behaves inconsistently across browsers. Tracking
-  // mousedown/mousemove/mouseup ourselves works the same everywhere.
-  const dragOverIndexRef = useRef<number | null>(null);
-  const mousePosRef = useRef({ x: 0, y: 0 });
-  const startDrag = (index: number, e: { clientX: number; clientY: number }) => {
-    mousePosRef.current = { x: e.clientX, y: e.clientY };
-    setDraggedIndex(index);
-    dragOverIndexRef.current = index;
-    setDragOverIndex(index);
-  };
-  useEffect(() => {
-    if (draggedIndex === null) return;
-    const prevUserSelect = document.body.style.userSelect;
-    const prevCursor = document.body.style.cursor;
-    document.body.style.userSelect = "none";
-    document.body.style.cursor = "grabbing";
-
-    const updateDragOverAt = (x: number, y: number) => {
-      const target = document.elementFromPoint(x, y) as HTMLElement | null;
-      const row = target?.closest<HTMLElement>("[data-body-index]");
-      if (!row) return;
-      const idx = Number(row.dataset.bodyIndex);
-      if (idx !== dragOverIndexRef.current) {
-        dragOverIndexRef.current = idx;
-        setDragOverIndex(idx);
-      }
-    };
-
-    // Scroll the page when the pointer nears the top/bottom edge — the
-    // grip stays put while dragging, so this is the only way to reach
-    // body items above/below the current viewport. Runs every frame
-    // rather than only on mousemove so it keeps scrolling even while the
-    // mouse is held still at the edge, and re-checks the drop target
-    // after each scroll since the row under the cursor moves too.
-    const EDGE = 80;
-    const MAX_SPEED = 18;
-    let rafId: number;
-    const tick = () => {
-      const { x, y } = mousePosRef.current;
-      const vh = window.innerHeight;
-      let dy = 0;
-      if (y < EDGE) dy = -MAX_SPEED * (1 - y / EDGE);
-      else if (y > vh - EDGE) dy = MAX_SPEED * (1 - (vh - y) / EDGE);
-      if (dy !== 0) {
-        window.scrollBy(0, dy);
-        updateDragOverAt(x, y);
-      }
-      rafId = requestAnimationFrame(tick);
-    };
-    rafId = requestAnimationFrame(tick);
-
-    const onMove = (e: MouseEvent) => {
-      mousePosRef.current = { x: e.clientX, y: e.clientY };
-      updateDragOverAt(e.clientX, e.clientY);
-    };
-    const onUp = () => {
-      const to = dragOverIndexRef.current;
-      if (to !== null) moveBody(draggedIndex, to);
-      dragOverIndexRef.current = null;
-      setDraggedIndex(null);
-      setDragOverIndex(null);
-    };
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
-    return () => {
-      cancelAnimationFrame(rafId);
-      document.body.style.userSelect = prevUserSelect;
-      document.body.style.cursor = prevCursor;
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draggedIndex]);
+  const { draggedIndex, dragOverIndex, startDrag } = useDragReorder("data-body-index", moveBody);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
@@ -341,16 +264,14 @@ export function WorkoutBuilder() {
             <div
               key={i}
               data-body-index={i}
-              className={`flex items-stretch gap-0 rounded-lg transition-opacity ${
-                draggedIndex === i ? "opacity-40" : ""
-              } ${dragOverIndex === i && draggedIndex !== null && draggedIndex !== i ? "outline outline-2 outline-offset-2 outline-accent-500" : ""}`}
+              className={dragRowClassName(draggedIndex === i, dragOverIndex === i && draggedIndex !== null && draggedIndex !== i)}
             >
               <div
                 onMouseDown={(e) => {
                   e.preventDefault();
                   startDrag(i, e);
                 }}
-                className="flex w-8 shrink-0 cursor-grab select-none items-center justify-center rounded-l-lg text-lg leading-none text-slate-600 hover:bg-surface-800 hover:text-slate-300 active:cursor-grabbing"
+                className={dragHandleClassName}
                 aria-label="Drag to reorder"
               >
                 ⠿
