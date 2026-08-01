@@ -20,7 +20,7 @@ import { dragHandleClassName, dragRowClassName, useDragReorder } from "../hooks/
 import { useToasts } from "../hooks/useToasts";
 import { blankStep } from "../lib/steps";
 
-type Mode = "free_text" | "templates";
+type Mode = "free_text" | "templates" | "scratch";
 
 const SAMPLE_FREE_TEXT = "6x800m Intervalle bei 4:10/km, 400m Trabpause. 10 min Warmup, 5 min Cooldown.";
 
@@ -40,7 +40,8 @@ export function WorkoutBuilder() {
   const { toasts, pushToast } = useToasts();
 
   // Source recorded on first save — mirrors how the workout was produced.
-  const sourceForMode = () => (mode === "free_text" ? "text" : "template");
+  const sourceForMode = () =>
+    mode === "free_text" ? "text" : mode === "templates" ? "template" : "manual";
 
   const generate = async () => {
     setLoading(true);
@@ -61,6 +62,13 @@ export function WorkoutBuilder() {
     // Deep-cloned so re-selecting the same template never shares references
     // with a previously-loaded, since-edited workout.
     setWorkout(JSON.parse(JSON.stringify(tpl.workout)));
+    setWorkoutId(null);
+    setDirty(true);
+    setError(null);
+  };
+
+  const startFromScratch = () => {
+    setWorkout({ name: "New workout", sport, warmup: null, body: [], cooldown: null });
     setWorkoutId(null);
     setDirty(true);
     setError(null);
@@ -210,6 +218,10 @@ export function WorkoutBuilder() {
             className={mode === "templates" ? "btn-primary" : "btn-ghost"}
             onClick={() => setMode("templates")}
           >Templates</button>
+          <button
+            className={mode === "scratch" ? "btn-primary" : "btn-ghost"}
+            onClick={() => setMode("scratch")}
+          >From scratch</button>
         </div>
         {mode === "free_text" ? (
           <>
@@ -226,8 +238,17 @@ export function WorkoutBuilder() {
               {error && <p className="text-sm text-red-400">{error}</p>}
             </div>
           </>
-        ) : (
+        ) : mode === "templates" ? (
           <TemplateGallery sport={sport} onSelect={selectTemplate} />
+        ) : (
+          <div className="flex items-center gap-3">
+            <button className="btn-primary" onClick={startFromScratch}>
+              + Start blank workout
+            </button>
+            <p className="text-sm text-slate-400">
+              Build it step by step below — no generation, no template.
+            </p>
+          </div>
         )}
       </section>
 
