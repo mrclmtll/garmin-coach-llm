@@ -1,32 +1,21 @@
-import type { RepeatBlock, Step } from "../api/types";
+import type { RepeatBlock, Sport, Step } from "../api/types";
+import { blankStep } from "../lib/steps";
 import { StepCard } from "./StepCard";
 
 interface Props {
   block: RepeatBlock;
+  sport: Sport;
   onChange: (next: RepeatBlock) => void;
   onRemove: () => void;
 }
 
-export function RepeatBlockView({ block, onChange, onRemove }: Props) {
+export function RepeatBlockView({ block, sport, onChange, onRemove }: Props) {
   const updateStep = (i: number, next: Step) =>
     onChange({ ...block, steps: block.steps.map((s, idx) => (idx === i ? next : s)) });
   const removeStep = (i: number) =>
     onChange({ ...block, steps: block.steps.filter((_, idx) => idx !== i) });
   const addStep = () =>
-    onChange({
-      ...block,
-      steps: [
-        ...block.steps,
-        {
-          kind: "step",
-          label: "Work",
-          goal: { kind: "time", value: 60 },
-          target: { kind: "pace", min_sec_per_km: 300, max_sec_per_km: 270 },
-          role: "work",
-          sport: "running",
-        },
-      ],
-    });
+    onChange({ ...block, steps: [...block.steps, blankStep(sport, "work", "Work")] });
 
   return (
     <div className="card space-y-3 border-l-4 border-l-accent-500">
