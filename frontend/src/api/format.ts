@@ -17,28 +17,37 @@ export function formatPace(secPerKm: number): string {
   return `${m}:${s.toString().padStart(2, "0")}/km`;
 }
 
-export function formatGoal(goal: { kind: "time" | "distance"; value: number }): string {
+import type { Goal, Target } from "./types";
+
+export function formatGoal(goal: Goal): string {
   if (goal.kind === "time") {
     const m = Math.floor(goal.value / 60);
     const s = Math.round(goal.value % 60);
     return s === 0 ? `${m} min` : `${m}:${s.toString().padStart(2, "0")} min`;
   }
-  return goal.value >= 1000 ? `${(goal.value / 1000).toFixed(1)} km` : `${goal.value} m`;
+  if (goal.kind === "distance") {
+    return goal.value >= 1000 ? `${(goal.value / 1000).toFixed(1)} km` : `${goal.value} m`;
+  }
+  if (goal.kind === "lap_button") return "Lap button";
+  if (goal.kind === "calories") return `${goal.value} kcal`;
+  return `HR ${goal.value} bpm`; // heart_rate
 }
 
-export function formatTarget(target: {
-  kind: "pace" | "power" | "hr_zone";
-  min_sec_per_km?: number;
-  max_sec_per_km?: number;
-  min_watts?: number;
-  max_watts?: number;
-  zone?: number;
-}): string {
-  if (target.kind === "pace") {
-    return `${formatPace(target.min_sec_per_km!)} – ${formatPace(target.max_sec_per_km!)}`;
+export function formatTarget(target: Target): string {
+  switch (target.kind) {
+    case "pace":
+      return `${formatPace(target.min_sec_per_km)} – ${formatPace(target.max_sec_per_km)}`;
+    case "power":
+      return `${target.min_watts}–${target.max_watts} W`;
+    case "power_zone":
+      return `Power Zone ${target.zone}`;
+    case "cadence":
+      return `${target.min_cadence}–${target.max_cadence} spm`;
+    case "hr_zone":
+      return `HR Zone ${target.zone}`;
+    case "hr_custom":
+      return `${target.min_bpm}–${target.max_bpm} bpm`;
+    case "no_target":
+      return "No target";
   }
-  if (target.kind === "power") {
-    return `${target.min_watts}–${target.max_watts} W`;
-  }
-  return `Zone ${target.zone}`;
 }

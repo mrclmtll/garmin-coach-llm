@@ -20,20 +20,58 @@ class Sport(StrEnum):
 
 
 class StepRole(StrEnum):
+    """Garmin "Abschnittstyp". Each value is a genuinely distinct Garmin
+    stepType id (warmup=1, cooldown=2, interval=3, recovery=4, rest=5,
+    other=7). Confirmed via Garmin Connect's own editor (round-tripped
+    through the API): "Gehen" (walk) has no separate step type — it saves
+    as stepTypeId 3 ("interval"), identical to "Laufen" (run). Use WORK for
+    both; distinguish them with the step's label, not a separate role."""
+
     WARMUP = "warmup"
     WORK = "work"
     RECOVERY = "recovery"
+    REST = "rest"
+    OTHER = "other"
     COOLDOWN = "cooldown"
 
 
-class Goal(BaseModel):
-    """Discriminated by `kind`: either time-based or distance-based."""
+class TimeGoal(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["time"] = "time"
+    value: float = Field(gt=0)  # seconds
+
+
+class DistanceGoal(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["distance"] = "distance"
+    value: float = Field(gt=0)  # meters
+
+
+class LapButtonGoal(BaseModel):
+    """Open-ended: the step ends when the athlete presses the lap button."""
 
     model_config = ConfigDict(extra="forbid")
+    kind: Literal["lap_button"] = "lap_button"
 
-    kind: Literal["time", "distance"]
-    # seconds when kind=time, meters when kind=distance
-    value: float = Field(gt=0)
+
+class CaloriesGoal(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["calories"] = "calories"
+    value: int = Field(gt=0)  # kcal
+
+
+class HeartRateGoal(BaseModel):
+    """The step ends once heart rate reaches this value (bpm)."""
+
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["heart_rate"] = "heart_rate"
+    value: int = Field(gt=0, le=250)  # bpm
+
+
+Goal = Annotated[
+    TimeGoal | DistanceGoal | LapButtonGoal | CaloriesGoal | HeartRateGoal,
+    Field(discriminator="kind"),
+]
 
 
 class PaceRange(BaseModel):
@@ -45,10 +83,29 @@ class PaceRange(BaseModel):
 
 
 class PowerRange(BaseModel):
+    """Custom power target — an exact watt range you set yourself."""
+
     model_config = ConfigDict(extra="forbid")
     kind: Literal["power"] = "power"
     min_watts: int = Field(gt=0)
     max_watts: int = Field(gt=0)
+
+
+class PowerZone(BaseModel):
+    """Predefined power zone (Garmin cycling power zones, 1..7)."""
+
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["power_zone"] = "power_zone"
+    zone: int = Field(ge=1, le=7)
+
+
+class CadenceRange(BaseModel):
+    """Steps/min (running) or rpm (cycling) — unit follows the step's sport."""
+
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["cadence"] = "cadence"
+    min_cadence: int = Field(gt=0)
+    max_cadence: int = Field(gt=0)
 
 
 class HRZone(BaseModel):
@@ -58,7 +115,24 @@ class HRZone(BaseModel):
     zone: int = Field(ge=1, le=5)
 
 
-Target = Annotated[PaceRange | PowerRange | HRZone, Field(discriminator="kind")]
+class HRCustom(BaseModel):
+    """Custom heart-rate target — an exact bpm range you set yourself."""
+
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["hr_custom"] = "hr_custom"
+    min_bpm: int = Field(gt=0, le=250)
+    max_bpm: int = Field(gt=0, le=250)
+
+
+class NoTarget(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["no_target"] = "no_target"
+
+
+Target = Annotated[
+    PaceRange | PowerRange | PowerZone | CadenceRange | HRZone | HRCustom | NoTarget,
+    Field(discriminator="kind"),
+]
 
 
 class Step(BaseModel):

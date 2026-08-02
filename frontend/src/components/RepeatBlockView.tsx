@@ -16,7 +16,7 @@ export function RepeatBlockView({ block, sport, onChange, onRemove }: Props) {
   const removeStep = (i: number) =>
     onChange({ ...block, steps: block.steps.filter((_, idx) => idx !== i) });
   const addStep = () =>
-    onChange({ ...block, steps: [...block.steps, blankStep(sport, "work", "Work")] });
+    onChange({ ...block, steps: [...block.steps, blankStep(sport, "work")] });
   const moveStep = (from: number, to: number) => {
     if (from === to) return;
     const next = [...block.steps];

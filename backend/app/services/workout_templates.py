@@ -17,7 +17,7 @@ from typing import Literal
 from sqlalchemy.orm import Session
 
 from app.models.workout_template import WorkoutTemplateRow
-from app.schemas.workout import Goal, HRZone, Step, StepRole, Workout
+from app.schemas.workout import DistanceGoal, Goal, HRZone, Step, StepRole, TimeGoal, Workout
 
 
 def _step(label: str, goal: Goal, zone: Literal[1, 2, 3, 4, 5], role: StepRole) -> Step:
@@ -25,11 +25,11 @@ def _step(label: str, goal: Goal, zone: Literal[1, 2, 3, 4, 5], role: StepRole) 
 
 
 def _time(seconds: float) -> Goal:
-    return Goal(kind="time", value=seconds)
+    return TimeGoal(value=seconds)
 
 
 def _dist(meters: float) -> Goal:
-    return Goal(kind="distance", value=meters)
+    return DistanceGoal(value=meters)
 
 
 @dataclass(frozen=True)

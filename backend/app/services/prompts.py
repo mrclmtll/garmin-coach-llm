@@ -32,16 +32,27 @@ SCHEMA_DESCRIPTION: str = dedent(
     Step:
       {
         "kind": "step",          // literal
-        "label": "<string>",
-        "goal":  { "kind": "time" | "distance", "value": <number> },
-                 // value is seconds when kind=time, meters when kind=distance
+        "label": "<string>",     // shown as the step's note on the watch
+        "goal":
+          { "kind": "time",       "value": <seconds> }
+          | { "kind": "distance",   "value": <meters> }
+          | { "kind": "lap_button" }
+              // open-ended: ends when the athlete presses the lap button
+          | { "kind": "calories",   "value": <kcal> }
+          | { "kind": "heart_rate", "value": <bpm> }
+              // ends once heart rate reaches this value
         "target":
-          { "kind": "pace",    "min_sec_per_km": <sec>, "max_sec_per_km": <sec> }
+          { "kind": "pace",       "min_sec_per_km": <sec>, "max_sec_per_km": <sec> }
               // running, swimming
-          | { "kind": "power",  "min_watts": <w>, "max_watts": <w> }
-              // cycling
-          | { "kind": "hr_zone","zone": 1|2|3|4|5 },
-        "role": "warmup" | "work" | "recovery" | "cooldown",
+          | { "kind": "power",      "min_watts": <w>, "max_watts": <w> }
+              // cycling — custom watt range
+          | { "kind": "power_zone", "zone": 1|2|3|4|5|6|7 }
+              // cycling — predefined power zone
+          | { "kind": "cadence",    "min_cadence": <spm|rpm>, "max_cadence": <spm|rpm> }
+          | { "kind": "hr_zone",    "zone": 1|2|3|4|5 }
+          | { "kind": "hr_custom",  "min_bpm": <bpm>, "max_bpm": <bpm> }
+          | { "kind": "no_target" },
+        "role": "warmup" | "work" | "recovery" | "rest" | "other" | "cooldown",
         "sport": "running" | "cycling" | "swimming"
       }
 
@@ -49,9 +60,18 @@ SCHEMA_DESCRIPTION: str = dedent(
       { "kind": "repeat", "count": <int 1..50>, "steps": [ <Step>, ... ] }
 
     Rules:
-    - Use "kind" as the literal discriminator on every body item and step.
+    - Use "kind" as the literal discriminator on every body item, goal, and target.
     - Pace is in seconds per kilometer (running/swimming).
-    - Choose the target type that matches the sport.
+    - Choose the target type that matches the sport. Default to "pace" for
+      running/swimming and "power" for cycling unless the description asks
+      for cadence, a heart-rate target, or explicitly says "no target".
+    - Default to a "time" or "distance" goal. Only use "lap_button",
+      "calories", or "heart_rate" goals when the description explicitly
+      asks for one of those (e.g. "until lap button", "until 300 kcal",
+      "until heart rate hits 160").
+    - "recovery" (jogging/easing off) and "rest" (standing still / walking)
+      are different Garmin step types — pick "rest" only when the
+      description clearly means a full stop or walk, not an easy jog.
     - Repeat blocks should be used when the description has a "Nx" pattern.
 
     Pace formatting:

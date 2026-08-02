@@ -1,16 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import type { Sport, Step, StepRole } from "../api/types";
-import { blankStep } from "../lib/steps";
+import { blankStep, STEP_ROLE_LABELS } from "../lib/steps";
 
-// Mirrors StepRole in app/schemas/workout.py — one option per backend role,
-// nothing UI-only. Finer distinctions (e.g. "Walk" vs "Recovery") belong in
-// the step's own label/notes, not in a separate role.
-const ROLES: { label: string; role: StepRole }[] = [
-  { label: "Warmup", role: "warmup" },
-  { label: "Work", role: "work" },
-  { label: "Recovery", role: "recovery" },
-  { label: "Cooldown", role: "cooldown" },
-];
+// One option per backend role (STEP_ROLE_LABELS mirrors StepRole in
+// app/schemas/workout.py), nothing UI-only. Finer distinctions that aren't a
+// distinct Garmin step type (e.g. "Walk") belong in the step's own
+// label/notes, not in a separate role.
+const ROLES: { label: string; role: StepRole }[] = (
+  Object.keys(STEP_ROLE_LABELS) as StepRole[]
+).map((role) => ({ role, label: STEP_ROLE_LABELS[role] }));
 
 interface Props {
   sport: Sport;
@@ -32,9 +30,9 @@ export function AddSectionButton({ sport, onAdd }: Props) {
     return () => document.removeEventListener("mousedown", onPointerDown);
   }, [open]);
 
-  const choose = (role: StepRole, label: string) => {
+  const choose = (role: StepRole) => {
     setOpen(false);
-    onAdd(blankStep(sport, role, label));
+    onAdd(blankStep(sport, role));
   };
 
   return (
@@ -55,7 +53,7 @@ export function AddSectionButton({ sport, onAdd }: Props) {
               key={role}
               type="button"
               className="block w-full px-3 py-2 text-left text-sm text-slate-200 hover:bg-surface-700"
-              onClick={() => choose(role, label)}
+              onClick={() => choose(role)}
             >
               {label}
             </button>

@@ -12,6 +12,7 @@ import type { PushTarget } from "../components/PushButton";
 import { PushButton } from "../components/PushButton";
 import { RepeatBlockView } from "../components/RepeatBlockView";
 import { SavedWorkouts } from "../components/SavedWorkouts";
+import { SportIcon, SPORT_LABELS } from "../components/SportIcon";
 import { SportToggle } from "../components/SportToggle";
 import { StepCard } from "../components/StepCard";
 import { TemplateGallery } from "../components/TemplateGallery";
@@ -22,7 +23,7 @@ import { blankStep } from "../lib/steps";
 
 type Mode = "free_text" | "templates" | "scratch";
 
-const SAMPLE_FREE_TEXT = "6x800m Intervalle bei 4:10/km, 400m Trabpause. 10 min Warmup, 5 min Cooldown.";
+const SAMPLE_FREE_TEXT = "6x800m intervals at 4:10/km, 400m jog recovery. 10 min warmup, 5 min cooldown.";
 
 export function WorkoutBuilder() {
   const [mode, setMode] = useState<Mode>("free_text");
@@ -185,7 +186,7 @@ export function WorkoutBuilder() {
         {
           kind: "repeat", count: 4,
           steps: [{
-            kind: "step", label: "Work",
+            kind: "step", label: "",
             goal: { kind: "time", value: 300 },
             target: { kind: "pace", min_sec_per_km: 300, max_sec_per_km: 270 },
             role: "work", sport: workout.sport,
@@ -274,7 +275,10 @@ export function WorkoutBuilder() {
               )}
               <AddSectionButton sport={workout.sport} onAdd={addBodyStep} />
               <button className="btn-ghost" onClick={addRepeat}>+ Add repeat block</button>
-              <span className="ml-auto text-xs text-slate-500">Sport: {workout.sport}</span>
+              <span className="ml-auto inline-flex items-center gap-2 rounded-full border border-slate-700 bg-surface-900 px-3 py-1.5 text-sm font-medium text-slate-200">
+                <SportIcon sport={workout.sport} className="h-4 w-4 text-accent-400 [&>svg]:h-full [&>svg]:w-full" />
+                {SPORT_LABELS[workout.sport]}
+              </span>
             </div>
           </div>
 

@@ -67,17 +67,71 @@ def test_invalid_target_for_sport_is_rejected_by_schema() -> None:
 
 
 def test_distance_goal_with_pace_target_estimates_duration() -> None:
-    from app.schemas.workout import Goal, HRZone, PaceRange, Sport
+    from app.schemas.workout import DistanceGoal, HRZone, PaceRange, Sport, TimeGoal
     from app.services.garmin_format import _estimate_duration_seconds
 
     # 1000m at 4:00/km (240 sec/km => 0.24 sec/m => 240s)
     sec = _estimate_duration_seconds(
-        Goal(kind="distance", value=1000),
+        DistanceGoal(value=1000),
         PaceRange(min_sec_per_km=240, max_sec_per_km=240),
         Sport.RUNNING,
     )
     assert sec == pytest.approx(240.0, rel=0.01)
 
     # time goal is passed through
-    sec = _estimate_duration_seconds(Goal(kind="time", value=600), HRZone(zone=2), Sport.RUNNING)
+    sec = _estimate_duration_seconds(TimeGoal(value=600), HRZone(zone=2), Sport.RUNNING)
     assert sec == 600.0
+
+
+def test_every_goal_and_target_kind_converts_to_garmin_step() -> None:
+    """Every Goal/Target variant must survive `to_garmin_workout` — this is
+    the full Garmin Connect parity surface (Dauer x Intensitätsziel)."""
+    from app.schemas.workout import (
+        CadenceRange,
+        CaloriesGoal,
+        DistanceGoal,
+        HeartRateGoal,
+        HRCustom,
+        HRZone,
+        LapButtonGoal,
+        NoTarget,
+        PaceRange,
+        PowerRange,
+        PowerZone,
+        Step,
+        TimeGoal,
+        Workout,
+    )
+    from app.services.garmin_format import to_garmin_workout
+
+    goals = [
+        TimeGoal(value=300),
+        DistanceGoal(value=1000),
+        LapButtonGoal(),
+        CaloriesGoal(value=200),
+        HeartRateGoal(value=160),
+    ]
+    targets = [
+        PaceRange(min_sec_per_km=300, max_sec_per_km=270),
+        PowerRange(min_watts=200, max_watts=250),
+        PowerZone(zone=3),
+        CadenceRange(min_cadence=170, max_cadence=180),
+        HRZone(zone=2),
+        HRCustom(min_bpm=140, max_bpm=160),
+        NoTarget(),
+    ]
+    roles = ["warmup", "work", "recovery", "rest", "other", "cooldown"]
+
+    body = [
+        Step(label=f"g{gi}-t{ti}", goal=goal, target=target, role=roles[(gi + ti) % len(roles)], sport="running")
+        for gi, goal in enumerate(goals)
+        for ti, target in enumerate(targets)
+    ]
+    workout = Workout(name="parity-check", sport="running", body=body)
+
+    garmin_workout = to_garmin_workout(workout)
+    payload = garmin_workout.to_dict()
+    steps = payload["workoutSegments"][0]["workoutSteps"]
+    assert len(steps) == len(goals) * len(targets)
+    for step, model_step in zip(steps, body, strict=True):
+        assert step["description"] == model_step.label

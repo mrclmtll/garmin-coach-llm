@@ -39,14 +39,19 @@ from garminconnect.workout import (
 
 from app.logging_context import get_logger
 from app.schemas.workout import (
+    CadenceRange,
     Goal,
+    HRCustom,
     HRZone,
+    NoTarget,
     PaceRange,
     PowerRange,
+    PowerZone,
     RepeatBlock,
     Sport,
     Step,
     StepRole,
+    Target,
     Workout,
 )
 
@@ -67,20 +72,35 @@ _FALLBACK_SWIM_PACE_SEC_PER_KM = 2 * 60  # 2:00/km (= 1:12 / 100m)
 
 # ---- target conversion ----------------------------------------------------
 
-_PACE_TARGET: dict[str, Any] = {
-    "workoutTargetTypeId": 6,
-    "workoutTargetTypeKey": "pace.zone",
-    "displayOrder": 6,
+_NO_TARGET: dict[str, Any] = {
+    "workoutTargetTypeId": 1,
+    "workoutTargetTypeKey": "no.target",
+    "displayOrder": 1,
 }
 _POWER_TARGET: dict[str, Any] = {
     "workoutTargetTypeId": 2,
     "workoutTargetTypeKey": "power.zone",
     "displayOrder": 2,
 }
+_CADENCE_TARGET: dict[str, Any] = {
+    "workoutTargetTypeId": 3,
+    "workoutTargetTypeKey": "cadence.zone",
+    "displayOrder": 3,
+}
+# Same targetType for a predefined zone (zoneNumber) and a custom bpm range
+# (targetValueOne/Two) — Garmin has one heart-rate targetType, not two. The
+# key follows the dot-separated convention seen in real Garmin payloads
+# ("pace.zone", "power.zone", "no.target"); a prior version of this constant
+# used "heart_rate.zone" (underscore), which doesn't match that convention.
 _HR_ZONE_TARGET: dict[str, Any] = {
     "workoutTargetTypeId": 4,
-    "workoutTargetTypeKey": "heart_rate.zone",
+    "workoutTargetTypeKey": "heart.rate.zone",
     "displayOrder": 4,
+}
+_PACE_TARGET: dict[str, Any] = {
+    "workoutTargetTypeId": 6,
+    "workoutTargetTypeKey": "pace.zone",
+    "displayOrder": 6,
 }
 
 
@@ -96,15 +116,15 @@ def _pace_bounds_mps(target: PaceRange) -> tuple[float, float]:
     return min_mps, max_mps
 
 
-def _target_dict_and_values(
-    target: PaceRange | PowerRange | HRZone,
-) -> tuple[dict[str, Any], dict[str, Any]]:
+def _target_dict_and_values(target: Target) -> tuple[dict[str, Any], dict[str, Any]]:
     """Return (targetType dict, extra step fields for the actual values).
 
-    For pace and power, the numeric bounds live on the step (as
-    `targetValueOne` / `targetValueTwo`), not inside `targetType` — that is
-    what Garmin's round-tripped workouts do, and the upload endpoint expects
-    the same shape.
+    For custom ranges (pace, power, cadence, custom HR), the numeric bounds
+    live on the step (as `targetValueOne` / `targetValueTwo`), not inside
+    `targetType` — that is what Garmin's round-tripped workouts do, and the
+    upload endpoint expects the same shape. Predefined zones (HR zone, power
+    zone) use the same targetType as their custom counterpart but set
+    `zoneNumber` instead.
     """
     if isinstance(target, PaceRange):
         min_mps, max_mps = _pace_bounds_mps(target)
@@ -117,7 +137,22 @@ def _target_dict_and_values(
             "targetValueOne": float(target.min_watts),
             "targetValueTwo": float(target.max_watts),
         }
-    return _HR_ZONE_TARGET, {"zoneNumber": int(target.zone)}
+    if isinstance(target, PowerZone):
+        return _POWER_TARGET, {"zoneNumber": int(target.zone)}
+    if isinstance(target, CadenceRange):
+        return _CADENCE_TARGET, {
+            "targetValueOne": float(target.min_cadence),
+            "targetValueTwo": float(target.max_cadence),
+        }
+    if isinstance(target, HRZone):
+        return _HR_ZONE_TARGET, {"zoneNumber": int(target.zone)}
+    if isinstance(target, HRCustom):
+        return _HR_ZONE_TARGET, {
+            "targetValueOne": float(target.min_bpm),
+            "targetValueTwo": float(target.max_bpm),
+        }
+    assert isinstance(target, NoTarget)
+    return _NO_TARGET, {}
 
 
 # ---- duration estimation --------------------------------------------------
@@ -131,34 +166,48 @@ def _default_speed_m_per_s(sport: Sport) -> float:
     return 1000 / pace
 
 
-def _estimate_duration_seconds(
-    goal: Goal, target: PaceRange | PowerRange | HRZone, sport: Sport
-) -> float:
+# Flat guess for goals with no time/distance value to derive a duration from
+# (lap-button, calories, heart-rate-threshold end conditions). Only feeds
+# `estimatedDurationInSecs`, which Garmin's UI uses for display — not
+# behavior — so a rough number is fine.
+_FALLBACK_OPEN_ENDED_SECONDS = 300.0
+
+
+def _estimate_duration_seconds(goal: Goal, target: Target, sport: Sport) -> float:
     if goal.kind == "time":
         return float(goal.value)
+    if goal.kind in ("lap_button", "calories", "heart_rate"):
+        return _FALLBACK_OPEN_ENDED_SECONDS
     # distance in meters
     if isinstance(target, PaceRange):
         # sec/km -> sec/m
         avg_sec_per_m = ((target.min_sec_per_km + target.max_sec_per_km) / 2) / 1000
         return float(goal.value) * avg_sec_per_m
-    if isinstance(target, PowerRange):
-        # We can't translate watts into a time from a distance. Garmin's API
-        # would want a duration here; fall back to a sport-default speed.
-        return float(goal.value) / _default_speed_m_per_s(sport)
-    # HR zone — no pace info, use sport default.
+    # No pace info to translate distance into time (power, cadence, HR
+    # targets, or no target at all) — fall back to a sport-default speed.
     return float(goal.value) / _default_speed_m_per_s(sport)
 
 
 # ---- step construction ----------------------------------------------------
 
-# Garmin stepType keys + displayOrder (matches library + round-tripped output).
+# Garmin stepType id + key (matches garminconnect.workout.StepType + the
+# round-tripped output above). displayOrder always matches the id in every
+# observed Garmin payload, so the id doubles as displayOrder below.
 _STEP_TYPE: dict[StepRole, tuple[str, int]] = {
     StepRole.WARMUP: ("warmup", 1),
     StepRole.COOLDOWN: ("cooldown", 2),
     StepRole.WORK: ("interval", 3),
     StepRole.RECOVERY: ("recovery", 4),
+    StepRole.REST: ("rest", 5),
+    StepRole.OTHER: ("other", 7),
 }
 
+_END_CONDITION_LAP_BUTTON: dict[str, Any] = {
+    "conditionTypeId": 1,
+    "conditionTypeKey": "lap.button",
+    "displayOrder": 1,
+    "displayable": True,
+}
 _END_CONDITION_TIME: dict[str, Any] = {
     "conditionTypeId": 2,
     "conditionTypeKey": "time",
@@ -169,6 +218,18 @@ _END_CONDITION_DISTANCE: dict[str, Any] = {
     "conditionTypeId": 3,
     "conditionTypeKey": "distance",
     "displayOrder": 3,
+    "displayable": True,
+}
+_END_CONDITION_CALORIES: dict[str, Any] = {
+    "conditionTypeId": 4,
+    "conditionTypeKey": "calories",
+    "displayOrder": 4,
+    "displayable": True,
+}
+_END_CONDITION_HEART_RATE: dict[str, Any] = {
+    "conditionTypeId": 6,
+    "conditionTypeKey": "heart.rate",
+    "displayOrder": 6,
     "displayable": True,
 }
 _PREFERRED_UNIT_KM: dict[str, Any] = {
@@ -189,21 +250,27 @@ def _make_step(
     Garmin's own round-tripped output)."""
     target_type, value_fields = _target_dict_and_values(step.target)
 
+    end_condition_value: float | None
+    preferred_unit: dict[str, Any] | None = None
     if step.goal.kind == "time":
         end_condition = _END_CONDITION_TIME
-        end_condition_value: float = float(step.goal.value)
-        preferred_unit: dict[str, Any] | None = None
-    else:  # distance in meters
+        end_condition_value = float(step.goal.value)
+    elif step.goal.kind == "distance":
         end_condition = _END_CONDITION_DISTANCE
         end_condition_value = float(step.goal.value)
         preferred_unit = _PREFERRED_UNIT_KM
+    elif step.goal.kind == "lap_button":
+        end_condition = _END_CONDITION_LAP_BUTTON
+        end_condition_value = None
+    elif step.goal.kind == "calories":
+        end_condition = _END_CONDITION_CALORIES
+        end_condition_value = float(step.goal.value)
+    else:  # heart_rate
+        end_condition = _END_CONDITION_HEART_RATE
+        end_condition_value = float(step.goal.value)
 
-    type_key, type_display_order = _STEP_TYPE[step.role]
-    step_type = {
-        "stepTypeId": {"warmup": 1, "cooldown": 2, "interval": 3, "recovery": 4}[type_key],
-        "stepTypeKey": type_key,
-        "displayOrder": type_display_order,
-    }
+    type_key, type_id = _STEP_TYPE[step.role]
+    step_type = {"stepTypeId": type_id, "stepTypeKey": type_key, "displayOrder": type_id}
 
     fields: dict[str, Any] = {
         "stepOrder": step_order,
@@ -212,6 +279,7 @@ def _make_step(
         "endConditionValue": end_condition_value,
         "targetType": target_type,
         "childStepId": child_step_id,
+        "description": step.label or None,
     }
     if preferred_unit is not None:
         fields["preferredEndConditionUnit"] = preferred_unit
