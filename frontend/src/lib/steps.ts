@@ -1,4 +1,4 @@
-import type { Goal, Sport, Step, StepRole, Target } from "../api/types";
+import type { Goal, SwimEffort, SwimEquipment, SwimStroke, Sport, Step, StepRole, Target } from "../api/types";
 
 // No target is a valid choice for every sport, so it's the sensible default
 // — no need to guess a sport-specific pace/power range upfront.
@@ -14,13 +14,40 @@ export function blankStep(sport: Sport, role: StepRole, label: string = ""): Ste
     target: defaultTarget(),
     role,
     sport,
+    stroke: null,
+    equipment: null,
   };
 }
 
+// Swim sets are almost always followed by a rest until the athlete presses
+// lap — so every swim block (a "Swim" section, or one repetition of a
+// repeat block) gets one of these tacked on automatically.
+export function blankSwimPauseStep(): Step {
+  return {
+    kind: "step",
+    label: "",
+    goal: { kind: "lap_button" },
+    target: { kind: "no_target" },
+    role: "rest",
+    sport: "swimming",
+    stroke: null,
+    equipment: null,
+  };
+}
+
+// A swim block is a Swim step immediately followed by a rest-until-lap —
+// this is what every "add a swim section" entry point produces.
+export function blankSwimBlock(): Step[] {
+  return [blankStep("swimming", "work"), blankSwimPauseStep()];
+}
+
 // Garmin's own labels for the "Step Type" dropdown. Garmin Connect's own
-// editor round-trips "Walk" as the exact same stepType as "Run"
-// (interval/3) — confirmed via the API — so it isn't a separate role here.
-// Use "work" for both and tell them apart via the step's label.
+// editor round-trips "Walk" as the exact same stepType as "Run" (interval/3),
+// and "Schwimmen" (Swim) as the same id for swimming — confirmed via the
+// API — so neither is a separate role here. Use "work" for all of them and
+// tell them apart via the step's label. The label itself is sport-dependent
+// (see stepRoleLabel below) since Garmin calls this role "Run" for running
+// and "Swim" for swimming.
 export const STEP_ROLE_LABELS: Record<StepRole, string> = {
   warmup: "Warmup",
   work: "Run",
@@ -29,6 +56,11 @@ export const STEP_ROLE_LABELS: Record<StepRole, string> = {
   other: "Other",
   cooldown: "Cool Down",
 };
+
+export function stepRoleLabel(role: StepRole, sport: Sport): string {
+  if (role === "work" && sport === "swimming") return "Swim";
+  return STEP_ROLE_LABELS[role];
+}
 
 // One accent color per step type, shown as the step's heading + left
 // border — so the step's kind is visible at a glance without needing the
@@ -58,4 +90,44 @@ export const TARGET_KIND_LABELS: Record<Target["kind"], string> = {
   hr_custom: "Custom Heart Rate",
   power_zone: "Power Zone",
   power: "Custom Power",
+  swim_pace: "Target Pace",
+  swim_css_pace: "CSS-Based Target Pace",
+  swim_effort: "Effort-Based",
+};
+
+// Swimming only. Ids confirmed by round-tripping candidates through Garmin
+// Connect's own editor — id 4 ("Choice + Drill") isn't one of the 9 real
+// choices and is deliberately left unexposed.
+export const SWIM_STROKE_LABELS: Record<SwimStroke, string> = {
+  choice: "Choice",
+  freestyle: "Freestyle",
+  backstroke: "Backstroke",
+  breaststroke: "Breaststroke",
+  butterfly: "Butterfly",
+  im: "Individual Medley",
+  im_ladder: "Individual Medley Ladder",
+  im_reverse: "Individual Medley Reverse Order",
+  various: "Various",
+};
+
+export const SWIM_EQUIPMENT_LABELS: Record<SwimEquipment, string> = {
+  fins: "Fins",
+  kickboard: "Kickboard",
+  paddles: "Paddles",
+  pull_buoy: "Pull Buoy",
+  snorkel: "Snorkel",
+};
+
+// Effort-based swim target levels. Ids confirmed by round-tripping all 8
+// through Garmin Connect's own editor — ids 2 and 8 don't correspond to any
+// of these and are left out.
+export const SWIM_EFFORT_LABELS: Record<SwimEffort, string> = {
+  recovery: "Recovery",
+  easy: "Easy",
+  moderate: "Moderate",
+  hard: "Hard",
+  very_hard: "Very Hard",
+  maximum: "Maximum",
+  ascending: "Ascending",
+  descending: "Descending",
 };

@@ -17,7 +17,14 @@ export function formatPace(secPerKm: number): string {
   return `${m}:${s.toString().padStart(2, "0")}/km`;
 }
 
+export function formatSwimPace(secPer100m: number): string {
+  const m = Math.floor(secPer100m / 60);
+  const s = Math.round(secPer100m % 60);
+  return `${m}:${s.toString().padStart(2, "0")}/100m`;
+}
+
 import type { Goal, Target } from "./types";
+import { SWIM_EFFORT_LABELS } from "../lib/steps";
 
 export function formatGoal(goal: Goal): string {
   if (goal.kind === "time") {
@@ -49,5 +56,13 @@ export function formatTarget(target: Target): string {
       return `${target.min_bpm}–${target.max_bpm} bpm`;
     case "no_target":
       return "No target";
+    case "swim_pace":
+      return formatSwimPace(target.sec_per_100m);
+    case "swim_css_pace": {
+      const s = target.offset_seconds;
+      return `CSS ${s > 0 ? "+" : ""}${s}s`;
+    }
+    case "swim_effort":
+      return SWIM_EFFORT_LABELS[target.level];
   }
 }

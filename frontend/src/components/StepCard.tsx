@@ -1,6 +1,14 @@
-import type { Goal, Step, Target } from "../api/types";
-import { formatGoal, formatPace, formatTarget } from "../api/format";
-import { GOAL_KIND_LABELS, STEP_ROLE_LABELS, STEP_ROLE_STYLES, TARGET_KIND_LABELS } from "../lib/steps";
+import type { Goal, Step, SwimEffort, SwimEquipment, SwimStroke, Target } from "../api/types";
+import { formatGoal, formatPace, formatSwimPace, formatTarget } from "../api/format";
+import {
+  GOAL_KIND_LABELS,
+  STEP_ROLE_STYLES,
+  stepRoleLabel,
+  SWIM_EFFORT_LABELS,
+  SWIM_EQUIPMENT_LABELS,
+  SWIM_STROKE_LABELS,
+  TARGET_KIND_LABELS,
+} from "../lib/steps";
 
 interface Props {
   step: Step;
@@ -9,15 +17,23 @@ interface Props {
 }
 
 const ROLES = ["warmup", "work", "recovery", "rest", "other", "cooldown"] as const;
-const GOAL_KINDS = ["time", "distance", "lap_button", "calories", "heart_rate"] as const;
-// Pace only applies to running/swimming; power (custom or zone) only to
-// cycling. Cadence, HR (zone/custom) and "no target" are sport-agnostic.
+const STROKES = ["choice", "freestyle", "backstroke", "breaststroke", "butterfly", "im", "im_ladder", "im_reverse", "various"] as const;
+const EQUIPMENT = ["fins", "kickboard", "paddles", "pull_buoy", "snorkel"] as const;
+const EFFORTS = ["recovery", "easy", "moderate", "hard", "very_hard", "maximum", "ascending", "descending"] as const;
+// Swimming has no calories/heart_rate end condition, and only accepts pace
+// as an intensity target (no HR zone, no cadence) — confirmed against
+// Garmin Connect's own swim editor.
+const GOAL_KINDS_BY_SPORT: Record<Step["sport"], Goal["kind"][]> = {
+  running: ["time", "distance", "lap_button", "calories", "heart_rate"],
+  cycling: ["time", "distance", "lap_button", "calories", "heart_rate"],
+  swimming: ["time", "distance", "lap_button"],
+};
 // Steps inherit their sport from the workout (set once via the sport toggle)
 // — it isn't editable per step, since a workout is pushed to Garmin as a
 // single sport regardless of what any individual step says.
 const TARGET_KINDS_BY_SPORT: Record<Step["sport"], Target["kind"][]> = {
   running: ["pace", "cadence", "hr_zone", "hr_custom", "no_target"],
-  swimming: ["pace", "cadence", "hr_zone", "hr_custom", "no_target"],
+  swimming: ["swim_pace", "swim_css_pace", "swim_effort", "no_target"],
   cycling: ["power", "power_zone", "cadence", "hr_zone", "hr_custom", "no_target"],
 };
 
@@ -37,6 +53,12 @@ function defaultTargetForKind(kind: Target["kind"]): Target {
       return { kind: "hr_custom", min_bpm: 140, max_bpm: 160 };
     case "no_target":
       return { kind: "no_target" };
+    case "swim_pace":
+      return { kind: "swim_pace", sec_per_100m: 120 }; // 2:00/100m — Garmin's own default
+    case "swim_css_pace":
+      return { kind: "swim_css_pace", offset_seconds: 0 };
+    case "swim_effort":
+      return { kind: "swim_effort", level: "moderate" };
   }
 }
 
@@ -62,13 +84,14 @@ export function StepCard({ step, onChange, onRemove }: Props) {
   const setTargetKind = (kind: Target["kind"]) => onChange({ ...step, target: defaultTargetForKind(kind) });
 
   const targetKinds = TARGET_KINDS_BY_SPORT[step.sport];
+  const goalKinds = GOAL_KINDS_BY_SPORT[step.sport];
 
   const roleStyle = STEP_ROLE_STYLES[step.role];
 
   return (
     <div className={`card space-y-3 border-l-4 ${roleStyle.border}`}>
       <div className="flex items-center justify-between">
-        <span className={`text-sm font-semibold ${roleStyle.text}`}>{STEP_ROLE_LABELS[step.role]}</span>
+        <span className={`text-sm font-semibold ${roleStyle.text}`}>{stepRoleLabel(step.role, step.sport)}</span>
         <button className="btn-ghost ml-2" onClick={onRemove} aria-label="Remove step">
           ×
         </button>
@@ -86,13 +109,13 @@ export function StepCard({ step, onChange, onRemove }: Props) {
         <div>
           <label className="label">Step Type</label>
           <select className="input" value={step.role} onChange={(e) => set("role", e.target.value as Step["role"])}>
-            {ROLES.map((r) => <option key={r} value={r}>{STEP_ROLE_LABELS[r]}</option>)}
+            {ROLES.map((r) => <option key={r} value={r}>{stepRoleLabel(r, step.sport)}</option>)}
           </select>
         </div>
         <div>
           <label className="label">Duration</label>
           <select className="input" value={step.goal.kind} onChange={(e) => setGoalKind(e.target.value as Goal["kind"])}>
-            {GOAL_KINDS.map((k) => <option key={k} value={k}>{GOAL_KIND_LABELS[k]}</option>)}
+            {goalKinds.map((k) => <option key={k} value={k}>{GOAL_KIND_LABELS[k]}</option>)}
           </select>
         </div>
         {step.goal.kind !== "lap_button" && (
@@ -116,6 +139,33 @@ export function StepCard({ step, onChange, onRemove }: Props) {
           </div>
         )}
       </div>
+
+      {step.sport === "swimming" && (
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label">Stroke</label>
+            <select
+              className="input"
+              value={step.stroke ?? ""}
+              onChange={(e) => set("stroke", (e.target.value || null) as SwimStroke | null)}
+            >
+              <option value="">—</option>
+              {STROKES.map((s) => <option key={s} value={s}>{SWIM_STROKE_LABELS[s]}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label">Equipment</label>
+            <select
+              className="input"
+              value={step.equipment ?? ""}
+              onChange={(e) => set("equipment", (e.target.value || null) as SwimEquipment | null)}
+            >
+              <option value="">—</option>
+              {EQUIPMENT.map((eq) => <option key={eq} value={eq}>{SWIM_EQUIPMENT_LABELS[eq]}</option>)}
+            </select>
+          </div>
+        </div>
+      )}
 
       <div>
         <label className="label">Target</label>
@@ -267,6 +317,51 @@ export function StepCard({ step, onChange, onRemove }: Props) {
                 }}
               />
             </div>
+          </div>
+        )}
+        {step.target.kind === "swim_pace" && (
+          <div className="mt-2 w-40">
+            <label className="label">sec / 100m</label>
+            <input
+              className="input"
+              type="number"
+              value={step.target.sec_per_100m}
+              onChange={(e) => {
+                if (step.target.kind !== "swim_pace") return;
+                onChange({ ...step, target: { ...step.target, sec_per_100m: Number(e.target.value) } });
+              }}
+            />
+            <p className="mt-1 text-xs text-slate-500">{formatSwimPace(step.target.sec_per_100m)}</p>
+          </div>
+        )}
+        {step.target.kind === "swim_css_pace" && (
+          <div className="mt-2 w-40">
+            <label className="label">Offset (sec)</label>
+            <input
+              className="input"
+              type="number"
+              value={step.target.offset_seconds}
+              onChange={(e) => {
+                if (step.target.kind !== "swim_css_pace") return;
+                onChange({ ...step, target: { ...step.target, offset_seconds: Number(e.target.value) } });
+              }}
+            />
+            <p className="mt-1 text-xs text-slate-500">Relative to your device's Critical Swim Speed</p>
+          </div>
+        )}
+        {step.target.kind === "swim_effort" && (
+          <div className="mt-2 w-48">
+            <label className="label">Level</label>
+            <select
+              className="input"
+              value={step.target.level}
+              onChange={(e) => {
+                if (step.target.kind !== "swim_effort") return;
+                onChange({ ...step, target: { ...step.target, level: e.target.value as SwimEffort } });
+              }}
+            >
+              {EFFORTS.map((l) => <option key={l} value={l}>{SWIM_EFFORT_LABELS[l]}</option>)}
+            </select>
           </div>
         )}
       </div>

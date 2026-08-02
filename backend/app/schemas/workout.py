@@ -129,10 +129,90 @@ class NoTarget(BaseModel):
     kind: Literal["no_target"] = "no_target"
 
 
+class SwimPace(BaseModel):
+    """Swimming's own pace target: a single value (not a min/max range), in
+    seconds per 100m — confirmed against Garmin Connect's own swim editor,
+    which shows e.g. "2:00/100m" rather than a range."""
+
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["swim_pace"] = "swim_pace"
+    sec_per_100m: float = Field(gt=0)
+
+
+class SwimCSSPace(BaseModel):
+    """Swimming's CSS-based pace target: an offset in seconds from the
+    athlete's Critical Swim Speed (e.g. "-2s"), confirmed against a workout
+    created directly in Garmin Connect's own editor."""
+
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["swim_css_pace"] = "swim_css_pace"
+    offset_seconds: float  # can be negative, zero, or positive
+
+
+class SwimEffort(StrEnum):
+    """Garmin's "Anstrengungsbasiert" (effort-based) swim target levels.
+    Ids confirmed by round-tripping all 8 through Garmin Connect's own
+    editor — ids 2 and 8 don't correspond to any of the 8 UI options and are
+    deliberately left out."""
+
+    RECOVERY = "recovery"  # 1
+    EASY = "easy"  # 3
+    MODERATE = "moderate"  # 4
+    HARD = "hard"  # 5
+    VERY_HARD = "very_hard"  # 6
+    MAXIMUM = "maximum"  # 7
+    ASCENDING = "ascending"  # 9
+    DESCENDING = "descending"  # 10
+
+
+class SwimEffortTarget(BaseModel):
+    """Swimming's effort-based target: a named exertion level rather than a
+    pace number."""
+
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["swim_effort"] = "swim_effort"
+    level: SwimEffort
+
+
 Target = Annotated[
-    PaceRange | PowerRange | PowerZone | CadenceRange | HRZone | HRCustom | NoTarget,
+    PaceRange
+    | PowerRange
+    | PowerZone
+    | CadenceRange
+    | HRZone
+    | HRCustom
+    | NoTarget
+    | SwimPace
+    | SwimCSSPace
+    | SwimEffortTarget,
     Field(discriminator="kind"),
 ]
+
+
+class SwimStroke(StrEnum):
+    """Garmin's swim stroke ids, confirmed by round-tripping through Garmin
+    Connect's own editor. Id 4 renders as an unlabeled "Wahl + Übung" — not
+    one of the 9 real stroke choices — so it's deliberately left out."""
+
+    CHOICE = "choice"  # 1 ("Wahl")
+    BACKSTROKE = "backstroke"  # 2
+    BREASTSTROKE = "breaststroke"  # 3
+    BUTTERFLY = "butterfly"  # 5
+    FREESTYLE = "freestyle"  # 6 ("Kraul")
+    IM = "im"  # 7 ("Lagen")
+    VARIOUS = "various"  # 8 ("Verschieden")
+    IM_LADDER = "im_ladder"  # 9 ("Lagen nach Runden")
+    IM_REVERSE = "im_reverse"  # 10 ("Lagen mit umgekehrter Reihenfolge")
+
+
+class SwimEquipment(StrEnum):
+    """Garmin's swim equipment ids, confirmed the same way as SwimStroke."""
+
+    FINS = "fins"  # 1
+    KICKBOARD = "kickboard"  # 2
+    PADDLES = "paddles"  # 3
+    PULL_BUOY = "pull_buoy"  # 4
+    SNORKEL = "snorkel"  # 5
 
 
 class Step(BaseModel):
@@ -144,6 +224,9 @@ class Step(BaseModel):
     target: Target
     role: StepRole
     sport: Sport
+    # Swimming only — None means "no stroke" / "no equipment" specified.
+    stroke: SwimStroke | None = None
+    equipment: SwimEquipment | None = None
 
 
 class RepeatBlock(BaseModel):
@@ -169,6 +252,8 @@ class Workout(BaseModel):
     warmup: Step | None = None
     body: list[BodyItem] = Field(default_factory=list)
     cooldown: Step | None = None
+    # Swimming only — Garmin requires a pool length on every swim workout.
+    pool_length_m: float = Field(default=25.0, gt=0)
 
 
 # Used by the LLM service to validate the model's JSON output.

@@ -19,7 +19,7 @@ import { TemplateGallery } from "../components/TemplateGallery";
 import { Toasts } from "../components/Toasts";
 import { dragHandleClassName, dragRowClassName, useDragReorder } from "../hooks/useDragReorder";
 import { useToasts } from "../hooks/useToasts";
-import { blankStep } from "../lib/steps";
+import { blankStep, blankSwimBlock, blankSwimPauseStep } from "../lib/steps";
 
 type Mode = "free_text" | "templates" | "scratch";
 
@@ -69,7 +69,7 @@ export function WorkoutBuilder() {
   };
 
   const startFromScratch = () => {
-    setWorkout({ name: "New workout", sport, warmup: null, body: [], cooldown: null });
+    setWorkout({ name: "New workout", sport, warmup: null, body: [], cooldown: null, pool_length_m: 25 });
     setWorkoutId(null);
     setDirty(true);
     setError(null);
@@ -173,25 +173,23 @@ export function WorkoutBuilder() {
     if (!workout) return;
     mutate({ ...workout, body: workout.body.filter((_, idx) => idx !== i) });
   };
-  const addBodyStep = (step: Step) => {
+  const addBodyStep = (steps: Step[]) => {
     if (!workout) return;
-    mutate({ ...workout, body: [...workout.body, step] });
+    mutate({ ...workout, body: [...workout.body, ...steps] });
   };
   const addRepeat = () => {
     if (!workout) return;
+    const isSwim = workout.sport === "swimming";
     mutate({
       ...workout,
       body: [
         ...workout.body,
         {
           kind: "repeat", count: 4,
-          steps: [{
-            kind: "step", label: "",
-            goal: { kind: "time", value: 300 },
-            target: { kind: "pace", min_sec_per_km: 300, max_sec_per_km: 270 },
-            role: "work", sport: workout.sport,
-          }],
+          steps: isSwim ? blankSwimBlock() : [blankStep(workout.sport, "work")],
         },
+        // A repeat block of swim sets is still followed by one more rest.
+        ...(isSwim ? [blankSwimPauseStep()] : []),
       ],
     });
   };
@@ -275,7 +273,20 @@ export function WorkoutBuilder() {
               )}
               <AddSectionButton sport={workout.sport} onAdd={addBodyStep} />
               <button className="btn-ghost" onClick={addRepeat}>+ Add repeat block</button>
-              <span className="ml-auto inline-flex items-center gap-2 rounded-full border border-slate-700 bg-surface-900 px-3 py-1.5 text-sm font-medium text-slate-200">
+              {workout.sport === "swimming" && (
+                <label className="ml-auto flex items-center gap-2 text-sm text-slate-300">
+                  Pool length
+                  <input
+                    className="input w-20"
+                    type="number"
+                    min={1}
+                    value={workout.pool_length_m}
+                    onChange={(e) => mutate({ ...workout, pool_length_m: Number(e.target.value) })}
+                  />
+                  m
+                </label>
+              )}
+              <span className={`inline-flex items-center gap-2 rounded-full border border-slate-700 bg-surface-900 px-3 py-1.5 text-sm font-medium text-slate-200 ${workout.sport === "swimming" ? "" : "ml-auto"}`}>
                 <SportIcon sport={workout.sport} className="h-4 w-4 text-accent-400 [&>svg]:h-full [&>svg]:w-full" />
                 {SPORT_LABELS[workout.sport]}
               </span>

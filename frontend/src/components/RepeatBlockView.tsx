@@ -1,6 +1,6 @@
 import type { RepeatBlock, Sport, Step } from "../api/types";
 import { dragHandleClassName, dragRowClassName, useDragReorder } from "../hooks/useDragReorder";
-import { blankStep } from "../lib/steps";
+import { blankStep, blankSwimBlock } from "../lib/steps";
 import { StepCard } from "./StepCard";
 
 interface Props {
@@ -16,7 +16,7 @@ export function RepeatBlockView({ block, sport, onChange, onRemove }: Props) {
   const removeStep = (i: number) =>
     onChange({ ...block, steps: block.steps.filter((_, idx) => idx !== i) });
   const addStep = () =>
-    onChange({ ...block, steps: [...block.steps, blankStep(sport, "work")] });
+    onChange({ ...block, steps: [...block.steps, ...(sport === "swimming" ? blankSwimBlock() : [blankStep(sport, "work")])] });
   const moveStep = (from: number, to: number) => {
     if (from === to) return;
     const next = [...block.steps];

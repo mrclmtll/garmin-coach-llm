@@ -51,6 +51,12 @@ from app.schemas.workout import (
     Sport,
     Step,
     StepRole,
+    SwimCSSPace,
+    SwimEffort,
+    SwimEffortTarget,
+    SwimEquipment,
+    SwimPace,
+    SwimStroke,
     Target,
     Workout,
 )
@@ -69,6 +75,37 @@ _SPORT_META: dict[Sport, dict[str, int | str]] = {
 _FALLBACK_PACE_SEC_PER_KM = 5 * 60  # 5:00/km
 _FALLBACK_CYCLING_KMH = 30.0
 _FALLBACK_SWIM_PACE_SEC_PER_KM = 2 * 60  # 2:00/km (= 1:12 / 100m)
+
+# Swim stroke/equipment ids, confirmed by round-tripping candidate ids
+# through Garmin Connect's own editor (see schemas/workout.py docstrings).
+_STROKE_ID: dict[SwimStroke, int] = {
+    SwimStroke.CHOICE: 1,
+    SwimStroke.BACKSTROKE: 2,
+    SwimStroke.BREASTSTROKE: 3,
+    SwimStroke.BUTTERFLY: 5,
+    SwimStroke.FREESTYLE: 6,
+    SwimStroke.IM: 7,
+    SwimStroke.VARIOUS: 8,
+    SwimStroke.IM_LADDER: 9,
+    SwimStroke.IM_REVERSE: 10,
+}
+_EFFORT_ID: dict[SwimEffort, int] = {
+    SwimEffort.RECOVERY: 1,
+    SwimEffort.EASY: 3,
+    SwimEffort.MODERATE: 4,
+    SwimEffort.HARD: 5,
+    SwimEffort.VERY_HARD: 6,
+    SwimEffort.MAXIMUM: 7,
+    SwimEffort.ASCENDING: 9,
+    SwimEffort.DESCENDING: 10,
+}
+_EQUIPMENT_ID: dict[SwimEquipment, int] = {
+    SwimEquipment.FINS: 1,
+    SwimEquipment.KICKBOARD: 2,
+    SwimEquipment.PADDLES: 3,
+    SwimEquipment.PULL_BUOY: 4,
+    SwimEquipment.SNORKEL: 5,
+}
 
 # ---- target conversion ----------------------------------------------------
 
@@ -101,6 +138,19 @@ _PACE_TARGET: dict[str, Any] = {
     "workoutTargetTypeId": 6,
     "workoutTargetTypeKey": "pace.zone",
     "displayOrder": 6,
+}
+# Confirmed against a workout created directly in Garmin Connect's own swim
+# editor (CSS-based target pace, "-2s" offset).
+_SWIM_CSS_TARGET: dict[str, Any] = {
+    "workoutTargetTypeId": 17,
+    "workoutTargetTypeKey": "swim.css.offset",
+    "displayOrder": 17,
+}
+# Confirmed the same way (effort-based target pace, all 8 levels).
+_SWIM_INSTRUCTION_TARGET: dict[str, Any] = {
+    "workoutTargetTypeId": 18,
+    "workoutTargetTypeKey": "swim.instruction",
+    "displayOrder": 18,
 }
 
 
@@ -151,6 +201,29 @@ def _target_dict_and_values(target: Target) -> tuple[dict[str, Any], dict[str, A
             "targetValueOne": float(target.min_bpm),
             "targetValueTwo": float(target.max_bpm),
         }
+    if isinstance(target, SwimPace):
+        # Swim intensity targets are structurally different: the *primary*
+        # targetType stays "no.target", and the real target (pace.zone here)
+        # goes in the *secondary* slot as a single value (not a range) —
+        # confirmed against a workout created directly in Garmin Connect's
+        # own swim editor.
+        return _NO_TARGET, {
+            "secondaryTargetType": _PACE_TARGET,
+            "secondaryTargetValueOne": 100.0 / target.sec_per_100m,
+            "secondaryTargetValueTwo": 0.0,
+        }
+    if isinstance(target, SwimCSSPace):
+        return _NO_TARGET, {
+            "secondaryTargetType": _SWIM_CSS_TARGET,
+            "secondaryTargetValueOne": float(target.offset_seconds),
+            "secondaryTargetValueTwo": 0.0,
+        }
+    if isinstance(target, SwimEffortTarget):
+        return _NO_TARGET, {
+            "secondaryTargetType": _SWIM_INSTRUCTION_TARGET,
+            "secondaryTargetValueOne": float(_EFFORT_ID[target.level]),
+            "secondaryTargetValueTwo": 0.0,
+        }
     assert isinstance(target, NoTarget)
     return _NO_TARGET, {}
 
@@ -183,6 +256,8 @@ def _estimate_duration_seconds(goal: Goal, target: Target, sport: Sport) -> floa
         # sec/km -> sec/m
         avg_sec_per_m = ((target.min_sec_per_km + target.max_sec_per_km) / 2) / 1000
         return float(goal.value) * avg_sec_per_m
+    if isinstance(target, SwimPace):
+        return float(goal.value) * (target.sec_per_100m / 100.0)
     # No pace info to translate distance into time (power, cadence, HR
     # targets, or no target at all) — fall back to a sport-default speed.
     return float(goal.value) / _default_speed_m_per_s(sport)
@@ -237,6 +312,13 @@ _PREFERRED_UNIT_KM: dict[str, Any] = {
     "unitKey": "kilometer",
     "factor": 100000.0,
 }
+# Swim distances are entered/displayed in meters (pool lengths), not
+# kilometers — confirmed by the real Garmin-authored showcase workout.
+_PREFERRED_UNIT_METER: dict[str, Any] = {
+    "unitId": 1,
+    "unitKey": "meter",
+    "factor": 100.0,
+}
 
 
 def _make_step(
@@ -258,7 +340,7 @@ def _make_step(
     elif step.goal.kind == "distance":
         end_condition = _END_CONDITION_DISTANCE
         end_condition_value = float(step.goal.value)
-        preferred_unit = _PREFERRED_UNIT_KM
+        preferred_unit = _PREFERRED_UNIT_METER if step.sport == Sport.SWIMMING else _PREFERRED_UNIT_KM
     elif step.goal.kind == "lap_button":
         end_condition = _END_CONDITION_LAP_BUTTON
         end_condition_value = None
@@ -284,6 +366,12 @@ def _make_step(
     if preferred_unit is not None:
         fields["preferredEndConditionUnit"] = preferred_unit
         fields["endConditionCompare"] = "gt"
+    if step.stroke is not None:
+        stroke_id = _STROKE_ID[step.stroke]
+        fields["strokeType"] = {"strokeTypeId": stroke_id, "displayOrder": stroke_id}
+    if step.equipment is not None:
+        equip_id = _EQUIPMENT_ID[step.equipment]
+        fields["equipmentType"] = {"equipmentTypeId": equip_id, "displayOrder": equip_id}
     fields.update(value_fields)
 
     return ExecutableStep(**fields)
@@ -372,7 +460,11 @@ def to_garmin_workout(workout: Workout) -> Any:
     elif workout.sport == Sport.CYCLING:
         result = CyclingWorkout(**common)
     elif workout.sport == Sport.SWIMMING:
-        result = SwimmingWorkout(**common)
+        result = SwimmingWorkout(
+            **common,
+            poolLength=workout.pool_length_m,
+            poolLengthUnit=_PREFERRED_UNIT_METER,
+        )
     else:
         raise ValueError(f"unsupported sport: {workout.sport}")
 

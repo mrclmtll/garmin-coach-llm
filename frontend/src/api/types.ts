@@ -21,7 +21,38 @@ export type Target =
   | { kind: "cadence"; min_cadence: number; max_cadence: number } // spm (run) / rpm (bike)
   | { kind: "hr_zone"; zone: 1 | 2 | 3 | 4 | 5 }
   | { kind: "hr_custom"; min_bpm: number; max_bpm: number }
-  | { kind: "no_target" };
+  | { kind: "no_target" }
+  | { kind: "swim_pace"; sec_per_100m: number } // single value, not a range
+  | { kind: "swim_css_pace"; offset_seconds: number } // offset from the athlete's Critical Swim Speed
+  | { kind: "swim_effort"; level: SwimEffort }; // named exertion level, not a pace number
+
+// Swim-only step fields. Garmin has no separate id for "drill" (Kick/Pull)
+// — the create-editor exposes it as an independent dropdown, but nobody has
+// reverse-engineered its JSON shape yet, so it isn't modeled here.
+export type SwimStroke =
+  | "choice"
+  | "backstroke"
+  | "breaststroke"
+  | "butterfly"
+  | "freestyle"
+  | "im"
+  | "various"
+  | "im_ladder"
+  | "im_reverse";
+
+// Ids confirmed by round-tripping all 8 through Garmin Connect's own editor
+// — ids 2 and 8 don't correspond to any of these and are left out.
+export type SwimEffort =
+  | "recovery"
+  | "easy"
+  | "moderate"
+  | "hard"
+  | "very_hard"
+  | "maximum"
+  | "ascending"
+  | "descending";
+
+export type SwimEquipment = "fins" | "kickboard" | "paddles" | "pull_buoy" | "snorkel";
 
 export interface Step {
   kind: "step";
@@ -30,6 +61,8 @@ export interface Step {
   target: Target;
   role: StepRole;
   sport: Sport;
+  stroke: SwimStroke | null;
+  equipment: SwimEquipment | null;
 }
 
 export interface RepeatBlock {
@@ -46,6 +79,7 @@ export interface Workout {
   warmup: Step | null;
   body: BodyItem[];
   cooldown: Step | null;
+  pool_length_m: number; // swimming only, ignored otherwise
 }
 
 // Lightweight row for the saved-workouts list — backend GET /workouts.
