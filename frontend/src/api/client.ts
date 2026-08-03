@@ -101,6 +101,18 @@ export async function listGarminWorkouts(): Promise<GarminWorkoutSummary[]> {
   return request<GarminWorkoutSummary[]>("/workouts/garmin");
 }
 
+export async function getGarminWorkout(id: string): Promise<Workout> {
+  return request<Workout>(`/workouts/garmin/${id}`);
+}
+
+export async function saveGarminWorkout(id: string, workout: Workout): Promise<Workout> {
+  return request<Workout>(`/workouts/garmin/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(workout),
+  });
+}
+
 export async function listGarminDevices(): Promise<GarminDevice[]> {
   return request<GarminDevice[]>("/workouts/devices");
 }

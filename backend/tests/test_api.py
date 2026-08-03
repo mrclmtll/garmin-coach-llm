@@ -44,6 +44,85 @@ def test_get_missing_workout_returns_404(client: TestClient) -> None:
     assert r.status_code == 404
 
 
+def test_get_garmin_workout_converts_raw_payload(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.routers import workouts as workouts_router
+
+    raw = {
+        "workoutName": "Easy Run",
+        "sportType": {"sportTypeKey": "running"},
+        "poolLength": None,
+        "workoutSegments": [
+            {
+                "workoutSteps": [
+                    {
+                        "type": "ExecutableStepDTO",
+                        "stepType": {"stepTypeKey": "interval"},
+                        "endCondition": {"conditionTypeKey": "time"},
+                        "endConditionValue": 600,
+                        "targetType": {"workoutTargetTypeKey": "no.target"},
+                        "description": "Steady",
+                    }
+                ]
+            }
+        ],
+    }
+    monkeypatch.setattr(workouts_router.garmin, "get_workout", lambda workout_id: raw)
+    r = client.get("/workouts/garmin/12345")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["name"] == "Easy Run"
+    assert body["sport"] == "running"
+    assert body["body"][0]["label"] == "Steady"
+    assert body["body"][0]["goal"] == {"kind": "time", "value": 600}
+
+
+def test_get_garmin_workout_missing_creds_returns_503(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.routers import workouts as workouts_router
+
+    def _raise(workout_id: str) -> None:
+        raise RuntimeError("GARMIN_EMAIL and GARMIN_PASSWORD must be set in the environment")
+
+    monkeypatch.setattr(workouts_router.garmin, "get_workout", _raise)
+    r = client.get("/workouts/garmin/12345")
+    assert r.status_code == 503
+
+
+def test_update_garmin_workout_calls_service_and_echoes_workout(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.routers import workouts as workouts_router
+
+    calls: list[tuple[str, object]] = []
+    monkeypatch.setattr(
+        workouts_router.garmin,
+        "update_workout",
+        lambda workout_id, workout: calls.append((workout_id, workout)) or {},
+    )
+    payload = {
+        "name": "Updated",
+        "sport": "running",
+        "body": [
+            {
+                "kind": "step",
+                "label": "x",
+                "goal": {"kind": "time", "value": 60},
+                "target": {"kind": "hr_zone", "zone": 2},
+                "role": "work",
+                "sport": "running",
+            }
+        ],
+    }
+    r = client.put("/workouts/garmin/12345", json=payload)
+    assert r.status_code == 200
+    assert r.json()["name"] == "Updated"
+    assert len(calls) == 1
+    assert calls[0][0] == "12345"
+
+
 def test_from_text_returns_422_when_ollama_unreachable(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

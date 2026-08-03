@@ -135,3 +135,87 @@ def test_every_goal_and_target_kind_converts_to_garmin_step() -> None:
     assert len(steps) == len(goals) * len(targets)
     for step, model_step in zip(steps, body, strict=True):
         assert step["description"] == model_step.label
+
+
+def test_from_garmin_workout_round_trips_to_garmin_workout() -> None:
+    """to_garmin_workout -> from_garmin_workout should reconstruct an
+    equivalent Workout for every well-supported goal/target kind — the same
+    parity surface as test_every_goal_and_target_kind_converts_to_garmin_step,
+    but for loading a Garmin workout back into the editor.
+
+    Body roles deliberately exclude warmup/cooldown: those are only
+    reconstructed correctly at the workout's dedicated warmup/cooldown slots
+    (Garmin's wire format has no field marking "this step is the dedicated
+    warmup slot" vs. "this step's role happens to be warmup" — the position
+    at the very start/end of the step list is the only signal, same
+    heuristic Garmin Connect's own UI relies on)."""
+    from app.schemas.workout import (
+        CadenceRange,
+        CaloriesGoal,
+        DistanceGoal,
+        HeartRateGoal,
+        HRCustom,
+        HRZone,
+        LapButtonGoal,
+        NoTarget,
+        PaceRange,
+        PowerRange,
+        PowerZone,
+        RepeatBlock,
+        Step,
+        TimeGoal,
+        Workout,
+    )
+    from app.services.garmin_format import from_garmin_workout, to_garmin_workout
+
+    goals = [
+        TimeGoal(value=300),
+        DistanceGoal(value=1000),
+        LapButtonGoal(),
+        CaloriesGoal(value=200),
+        HeartRateGoal(value=160),
+    ]
+    targets = [
+        PaceRange(min_sec_per_km=300, max_sec_per_km=270),
+        PowerRange(min_watts=200, max_watts=250),
+        PowerZone(zone=3),
+        CadenceRange(min_cadence=170, max_cadence=180),
+        HRZone(zone=2),
+        HRCustom(min_bpm=140, max_bpm=160),
+        NoTarget(),
+    ]
+    roles = ["work", "recovery", "rest", "other"]
+
+    plain_steps = [
+        Step(label=f"g{gi}-t{ti}", goal=goal, target=target, role=roles[(gi + ti) % len(roles)], sport="running")
+        for gi, goal in enumerate(goals)
+        for ti, target in enumerate(targets)
+    ]
+    warmup = Step(label="Warmup", goal=TimeGoal(value=600), target=HRZone(zone=1), role="warmup", sport="running")
+    cooldown = Step(label="Cooldown", goal=TimeGoal(value=300), target=NoTarget(), role="cooldown", sport="running")
+    repeat = RepeatBlock(count=4, steps=[plain_steps[0], plain_steps[1]])
+    body = [repeat, *plain_steps[2:]]
+    workout = Workout(name="round-trip-check", sport="running", warmup=warmup, body=body, cooldown=cooldown)
+
+    raw = to_garmin_workout(workout).to_dict()
+    reimported = from_garmin_workout(raw)
+
+    assert reimported.name == workout.name
+    assert reimported.sport == workout.sport
+    assert reimported.warmup == workout.warmup
+    assert reimported.cooldown == workout.cooldown
+    assert len(reimported.body) == len(workout.body)
+
+    reimported_repeat = reimported.body[0]
+    assert isinstance(reimported_repeat, RepeatBlock)
+    assert reimported_repeat.count == repeat.count
+    for original, back in zip(repeat.steps, reimported_repeat.steps, strict=True):
+        assert back.label == original.label
+        assert back.goal == original.goal
+        assert back.target == original.target
+
+    for original, back in zip(body[1:], reimported.body[1:], strict=True):
+        assert isinstance(back, Step)
+        assert back.label == original.label
+        assert back.goal == original.goal
+        assert back.target == original.target

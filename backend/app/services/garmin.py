@@ -48,6 +48,26 @@ def list_workouts(start: int = 0, limit: int = 100) -> list[dict[str, Any]]:
     return client.get_workouts(start=start, limit=limit)
 
 
+def get_workout(workout_id: str) -> dict[str, Any]:
+    """Return the full raw workout dict for one workout, including its
+    steps — unlike `list_workouts`, which only returns summary fields."""
+    client = _get_client()
+    return client.get_workout_by_id(workout_id)
+
+
+def update_workout(workout_id: str, workout: Workout) -> dict[str, Any]:
+    """Replace an existing Garmin workout in place, keeping its id (and any
+    calendar schedules pointing at it) intact. Returns the raw updated
+    workout dict, in the same shape as `get_workout`.
+    """
+    client = _get_client()
+    garmin_workout = to_garmin_workout(workout)
+    log.info(
+        "garmin update: id=%s sport=%s name=%r", workout_id, workout.sport.value, workout.name
+    )
+    return client.update_workout(workout_id, garmin_workout.to_dict())
+
+
 def _get_primary_device_id(client: Garmin) -> str | None:
     """Best-effort lookup of the account's primary training device id.
 

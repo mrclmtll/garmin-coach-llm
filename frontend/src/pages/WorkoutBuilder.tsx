@@ -3,6 +3,7 @@ import {
   createWorkout,
   generateFromText,
   pushWorkout,
+  saveGarminWorkout,
   saveWorkout,
 } from "../api/client";
 import type { Sport, Step, Workout, WorkoutTemplate } from "../api/types";
@@ -31,6 +32,10 @@ export function WorkoutBuilder() {
   const [input, setInput] = useState<string>(SAMPLE_FREE_TEXT);
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [workoutId, setWorkoutId] = useState<number | null>(null);
+  // Set when the loaded workout came from the Garmin pane (mutually
+  // exclusive with workoutId — a workout is either a local saved row or a
+  // Garmin-library one, never both at once).
+  const [garminWorkoutId, setGarminWorkoutId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -51,6 +56,7 @@ export function WorkoutBuilder() {
       const res = await generateFromText(input, sport);
       setWorkout(res.workout);
       setWorkoutId(null);
+      setGarminWorkoutId(null);
       setDirty(true);
     } catch (e) {
       setError((e as Error).message);
@@ -64,6 +70,7 @@ export function WorkoutBuilder() {
     // with a previously-loaded, since-edited workout.
     setWorkout(JSON.parse(JSON.stringify(tpl.workout)));
     setWorkoutId(null);
+    setGarminWorkoutId(null);
     setDirty(true);
     setError(null);
   };
@@ -71,6 +78,7 @@ export function WorkoutBuilder() {
   const startFromScratch = () => {
     setWorkout({ name: "New workout", sport, warmup: null, body: [], cooldown: null, pool_length_m: 25 });
     setWorkoutId(null);
+    setGarminWorkoutId(null);
     setDirty(true);
     setError(null);
   };
@@ -150,8 +158,36 @@ export function WorkoutBuilder() {
   const loadWorkout = (id: number, w: Workout) => {
     setWorkout(w);
     setWorkoutId(id);
+    setGarminWorkoutId(null);
     setDirty(false);
     setError(null);
+  };
+
+  const loadGarminWorkout = (id: string, w: Workout) => {
+    setWorkout(w);
+    setWorkoutId(null);
+    setGarminWorkoutId(id);
+    setDirty(false);
+    setError(null);
+  };
+
+  // Replaces the Garmin-side workout in place with the edited version — the
+  // Garmin counterpart to `save` (which persists to the local DB instead).
+  const saveToGarmin = async () => {
+    if (!workout || garminWorkoutId == null) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const updated = await saveGarminWorkout(garminWorkoutId, workout);
+      setWorkout(updated);
+      setDirty(false);
+      setRefreshKey((k) => k + 1);
+      pushToast(`Updated "${updated.name}" on Garmin`);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Mark dirty whenever the workout is edited after a generate/save.
@@ -335,8 +371,17 @@ export function WorkoutBuilder() {
                 {loading ? "Saving…" : "Save as new workout"}
               </button>
             )}
+            {garminWorkoutId !== null && (
+              <button className="btn-ghost" onClick={saveToGarmin} disabled={loading || !dirty}>
+                {loading ? "Saving…" : "Update on Garmin"}
+              </button>
+            )}
             {dirty && <span className="text-xs text-amber-400">Unsaved changes</span>}
-            {workoutId !== null && <span className="ml-auto text-xs text-slate-500">Workout id: {workoutId}</span>}
+            {(workoutId !== null || garminWorkoutId !== null) && (
+              <span className="ml-auto text-xs text-slate-500">
+                {workoutId !== null ? `Workout id: ${workoutId}` : `Garmin id: ${garminWorkoutId}`}
+              </span>
+            )}
           </div>
         </section>
       )}
@@ -355,6 +400,8 @@ export function WorkoutBuilder() {
         />
         <GarminWorkouts
           refreshKey={refreshKey}
+          activeId={garminWorkoutId}
+          onLoad={loadGarminWorkout}
           open={garminOpen}
           onToggle={() => setGarminOpen((v) => !v)}
         />

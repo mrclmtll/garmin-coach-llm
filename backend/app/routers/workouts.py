@@ -18,7 +18,7 @@ from app.db import get_db
 from app.logging_context import get_logger
 from app.models.workout import WorkoutRow
 from app.schemas.workout import Workout
-from app.services import garmin, llm
+from app.services import garmin, garmin_format, llm
 
 log = get_logger(__name__)
 
@@ -175,6 +175,35 @@ def list_garmin_workouts() -> list[GarminWorkoutSummary]:
     except Exception as e:  # garminconnect raises a variety of types
         raise HTTPException(status_code=502, detail=f"garmin fetch failed: {e}") from e
     return [_map_garmin_workout(w) for w in raw]
+
+
+@router.get("/garmin/{garmin_workout_id}", response_model=Workout)
+def get_garmin_workout(garmin_workout_id: str) -> Workout:
+    try:
+        raw = garmin.get_workout(garmin_workout_id)
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except Exception as e:  # garminconnect raises a variety of types
+        raise HTTPException(status_code=502, detail=f"garmin fetch failed: {e}") from e
+    try:
+        return garmin_format.from_garmin_workout(raw)
+    except Exception as e:
+        raise HTTPException(
+            status_code=422, detail=f"could not import Garmin workout: {e}"
+        ) from e
+
+
+@router.put("/garmin/{garmin_workout_id}", response_model=Workout)
+def update_garmin_workout(garmin_workout_id: str, workout: Workout) -> Workout:
+    """Replace an existing Garmin workout in place with the edited version —
+    the Garmin-side counterpart to `PATCH /workouts/{workout_id}`."""
+    try:
+        garmin.update_workout(garmin_workout_id, workout)
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+    except Exception as e:  # garminconnect raises a variety of types
+        raise HTTPException(status_code=502, detail=f"garmin update failed: {e}") from e
+    return workout
 
 
 @router.get("/devices", response_model=list[GarminDeviceSummary])

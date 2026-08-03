@@ -40,13 +40,18 @@ from garminconnect.workout import (
 from app.logging_context import get_logger
 from app.schemas.workout import (
     CadenceRange,
+    CaloriesGoal,
+    DistanceGoal,
     Goal,
+    HeartRateGoal,
     HRCustom,
     HRZone,
+    LapButtonGoal,
     NoTarget,
     PaceRange,
     PowerCurveInterval,
     PowerCurveTarget,
+    PowerGoal,
     PowerRange,
     PowerZone,
     RepeatBlock,
@@ -61,6 +66,7 @@ from app.schemas.workout import (
     SwimPace,
     SwimStroke,
     Target,
+    TimeGoal,
     Workout,
 )
 
@@ -568,3 +574,213 @@ def _compact_json(payload: Any) -> str:
     import json
 
     return json.dumps(payload, separators=(",", ":"), default=str)
+
+
+# ---- garminconnect workout dict -> internal Workout ------------------------
+#
+# Inverse of everything above. Unlike `to_garmin_workout`, this also has to
+# cope with workouts this app never produced (authored directly in Garmin
+# Connect's own editor, or by another app) — so every lookup below degrades
+# gracefully (falls back to NoTarget/WORK/lap-button, never raises) instead
+# of assuming the shape this app itself writes.
+
+_SPORT_KEY_TO_SPORT: dict[str, Sport] = {
+    "running": Sport.RUNNING,
+    "cycling": Sport.CYCLING,
+    "swimming": Sport.SWIMMING,
+}
+
+# Reverse of _STEP_TYPE, plus "main" (stepTypeId 8) which Garmin Connect's
+# own editor uses for work intervals — not one of our 6 roles, so it maps
+# onto WORK the same as "interval" does.
+_STEP_TYPE_KEY_TO_ROLE: dict[str, StepRole] = {key: role for role, (key, _id) in _STEP_TYPE.items()}
+_STEP_TYPE_KEY_TO_ROLE["main"] = StepRole.WORK
+
+_STROKE_ID_REV: dict[int, SwimStroke] = {v: k for k, v in _STROKE_ID.items()}
+_EQUIPMENT_ID_REV: dict[int, SwimEquipment] = {v: k for k, v in _EQUIPMENT_ID.items()}
+_EFFORT_ID_REV: dict[int, SwimEffort] = {v: k for k, v in _EFFORT_ID.items()}
+_POWER_CURVE_SECONDS_REV: dict[int, PowerCurveInterval] = {v: k for k, v in _POWER_CURVE_SECONDS.items()}
+
+
+def _goal_from_raw_step(raw_step: dict[str, Any]) -> Goal:
+    condition = raw_step.get("endCondition") or {}
+    key = condition.get("conditionTypeKey")
+    value = raw_step.get("endConditionValue")
+    if key == "time":
+        return TimeGoal(value=value)
+    if key == "distance":
+        # Always meters on the wire, regardless of preferredEndConditionUnit
+        # (that field only controls display) — see _make_step above.
+        return DistanceGoal(value=value)
+    if key == "lap.button":
+        return LapButtonGoal()
+    if key == "calories":
+        return CaloriesGoal(value=int(value))
+    if key == "heart.rate":
+        return HeartRateGoal(value=int(value))
+    if key == "power":
+        return PowerGoal(value=int(value))
+    if key == "fixed.rest":
+        # Garmin's "fixed rest" duration between repeat reps — not a
+        # distinct goal kind in our model, so it round-trips as plain time.
+        return TimeGoal(value=value) if value else LapButtonGoal()
+    log.warning("unrecognized end condition %r, importing step as lap-button", key)
+    return LapButtonGoal()
+
+
+def _parse_target_value(
+    key: str | None,
+    one: float | None,
+    two: float | None,
+    zone: int | None,
+    curve_duration: float | None,
+    curve_scale: float | None,
+) -> Target:
+    if key == "pace.zone" and one and two:
+        # targetValueOne is the faster (larger) m/s bound — see
+        # _pace_bounds_mps above.
+        return PaceRange(min_sec_per_km=1000.0 / one, max_sec_per_km=1000.0 / two)
+    if key == "power.zone":
+        if zone is not None:
+            return PowerZone(zone=int(zone))
+        if one is not None and two is not None:
+            return PowerRange(min_watts=int(one), max_watts=int(two))
+    if key == "cadence" and one is not None and two is not None:
+        return CadenceRange(min_cadence=int(one), max_cadence=int(two))
+    if key == "heart.rate.zone":
+        if zone is not None:
+            return HRZone(zone=int(zone))
+        if one is not None and two is not None:
+            return HRCustom(min_bpm=int(one), max_bpm=int(two))
+    if key == "speed.zone" and one is not None and two is not None:
+        return SpeedRange(min_kmh=one * 3600 / 1000, max_kmh=two * 3600 / 1000)
+    if key == "power.curve" and curve_duration is not None and curve_scale is not None:
+        interval = _POWER_CURVE_SECONDS_REV.get(int(curve_duration))
+        if interval is not None:
+            return PowerCurveTarget(interval=interval, percent=curve_scale)
+    return NoTarget()
+
+
+def _target_from_raw_step(raw_step: dict[str, Any]) -> tuple[Target, Target | None]:
+    """Returns (primary target, secondary target or None)."""
+    primary_key = (raw_step.get("targetType") or {}).get("workoutTargetTypeKey", "no.target")
+    secondary = raw_step.get("secondaryTargetType")
+    secondary_key = secondary.get("workoutTargetTypeKey") if secondary else None
+    secondary_one = raw_step.get("secondaryTargetValueOne")
+
+    # Swim intensity targets: primary stays "no.target", the real target is
+    # encoded on the secondary slot as a single value — see
+    # _target_dict_and_values above.
+    if primary_key == "no.target" and secondary_key == "pace.zone" and secondary_one:
+        return SwimPace(sec_per_100m=100.0 / secondary_one), None
+    if primary_key == "no.target" and secondary_key == "swim.css.offset" and secondary_one is not None:
+        return SwimCSSPace(offset_seconds=secondary_one), None
+    if primary_key == "no.target" and secondary_key == "swim.instruction" and secondary_one is not None:
+        level = _EFFORT_ID_REV.get(int(secondary_one))
+        if level is not None:
+            return SwimEffortTarget(level=level), None
+
+    primary_target = _parse_target_value(
+        primary_key,
+        raw_step.get("targetValueOne"),
+        raw_step.get("targetValueTwo"),
+        raw_step.get("zoneNumber"),
+        raw_step.get("powerCurveDuration"),
+        raw_step.get("powerCurveScale"),
+    )
+
+    secondary_target: Target | None = None
+    if secondary_key and secondary_key != "no.target":
+        secondary_target = _parse_target_value(
+            secondary_key,
+            secondary_one,
+            raw_step.get("secondaryTargetValueTwo"),
+            raw_step.get("secondaryZoneNumber"),
+            None,
+            None,
+        )
+        if isinstance(secondary_target, NoTarget):
+            secondary_target = None
+
+    return primary_target, secondary_target
+
+
+def _stroke_from_raw_step(raw_step: dict[str, Any]) -> SwimStroke | None:
+    stroke_id = (raw_step.get("strokeType") or {}).get("strokeTypeId")
+    return _STROKE_ID_REV.get(stroke_id) if stroke_id else None
+
+
+def _equipment_from_raw_step(raw_step: dict[str, Any]) -> SwimEquipment | None:
+    equipment_id = (raw_step.get("equipmentType") or {}).get("equipmentTypeId")
+    return _EQUIPMENT_ID_REV.get(equipment_id) if equipment_id else None
+
+
+def _step_from_raw(raw_step: dict[str, Any], sport: Sport) -> Step:
+    role_key = (raw_step.get("stepType") or {}).get("stepTypeKey")
+    role = _STEP_TYPE_KEY_TO_ROLE.get(role_key or "", StepRole.OTHER)
+    target, secondary_target = _target_from_raw_step(raw_step)
+    return Step(
+        label=(raw_step.get("description") or "").strip(),
+        goal=_goal_from_raw_step(raw_step),
+        target=target,
+        role=role,
+        sport=sport,
+        stroke=_stroke_from_raw_step(raw_step) if sport == Sport.SWIMMING else None,
+        equipment=_equipment_from_raw_step(raw_step) if sport == Sport.SWIMMING else None,
+        secondary_target=secondary_target,
+    )
+
+
+def _body_from_raw_steps(
+    raw_steps: list[dict[str, Any]], sport: Sport
+) -> tuple[Step | None, list[Step | RepeatBlock], Step | None]:
+    remaining = list(raw_steps)
+    warmup = None
+    if remaining and (remaining[0].get("stepType") or {}).get("stepTypeKey") == "warmup":
+        warmup = _step_from_raw(remaining[0], sport)
+        remaining = remaining[1:]
+
+    cooldown = None
+    if remaining and (remaining[-1].get("stepType") or {}).get("stepTypeKey") == "cooldown":
+        cooldown = _step_from_raw(remaining[-1], sport)
+        remaining = remaining[:-1]
+
+    body: list[Step | RepeatBlock] = []
+    for raw in remaining:
+        if raw.get("type") == "RepeatGroupDTO":
+            inner_steps = [_step_from_raw(s, sport) for s in raw.get("workoutSteps", [])]
+            if not inner_steps:
+                continue
+            count = max(1, min(50, int(raw.get("numberOfIterations") or 1)))
+            body.append(RepeatBlock(count=count, steps=inner_steps))
+        else:
+            body.append(_step_from_raw(raw, sport))
+    return warmup, body, cooldown
+
+
+def from_garmin_workout(raw: dict[str, Any]) -> Workout:
+    """Translate a garminconnect workout dict (as returned by
+    `get_workout_by_id`) back into our internal Workout.
+
+    Inverse of `to_garmin_workout` — but necessarily lossy for fields our
+    model doesn't represent (e.g. `drillType`), since this also has to
+    accept workouts authored directly in Garmin Connect's own editor, not
+    just ones this app produced.
+    """
+    sport_key = (raw.get("sportType") or {}).get("sportTypeKey")
+    sport = _SPORT_KEY_TO_SPORT.get(sport_key or "")
+    if sport is None:
+        raise ValueError(f"unsupported Garmin sport type: {sport_key!r}")
+
+    segments = raw.get("workoutSegments") or []
+    raw_steps = segments[0].get("workoutSteps", []) if segments else []
+    warmup, body, cooldown = _body_from_raw_steps(raw_steps, sport)
+
+    return Workout(
+        name=raw.get("workoutName") or "Untitled",
+        sport=sport,
+        warmup=warmup,
+        body=body,
+        cooldown=cooldown,
+        pool_length_m=float(raw.get("poolLength") or 25.0),
+    )

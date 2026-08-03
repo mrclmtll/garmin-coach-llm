@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { listGarminWorkouts } from "../api/client";
+import { getGarminWorkout, listGarminWorkouts } from "../api/client";
 import { formatDateTime } from "../api/format";
-import type { GarminWorkoutSummary } from "../api/types";
+import type { GarminWorkoutSummary, Workout } from "../api/types";
 import { usePolling } from "../hooks/usePolling";
 import { SportIcon } from "./SportIcon";
 
@@ -16,15 +16,21 @@ const RETRY_INTERVAL_MS = 3_000;
 interface Props {
   // Bumped after a generate/push so the list refreshes.
   refreshKey: number;
+  // Set when a row is clicked; the parent uses it to load the full workout
+  // into the editor.
+  onLoad: (id: string, workout: Workout) => void;
+  // Currently-loaded Garmin workout id, for highlighting the active row.
+  activeId: string | null;
   // Expand/collapse is controlled by the parent so it can size this pane
   // relative to its sibling (SavedWorkouts).
   open: boolean;
   onToggle: () => void;
 }
 
-export function GarminWorkouts({ refreshKey, open, onToggle }: Props) {
+export function GarminWorkouts({ refreshKey, onLoad, activeId, open, onToggle }: Props) {
   const [items, setItems] = useState<GarminWorkoutSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
@@ -49,6 +55,19 @@ export function GarminWorkouts({ refreshKey, open, onToggle }: Props) {
   }, [fetchItems, refreshKey]);
 
   usePolling(fetchItems, items === null || error ? RETRY_INTERVAL_MS : POLL_INTERVAL_MS);
+
+  const handleClick = async (id: string) => {
+    setLoadingId(id);
+    setError(null);
+    try {
+      const workout = await getGarminWorkout(id);
+      onLoad(id, workout);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoadingId(null);
+    }
+  };
 
   return (
     <section
@@ -81,19 +100,29 @@ export function GarminWorkouts({ refreshKey, open, onToggle }: Props) {
           )}
           {items && items.length > 0 && (
             <ul className="divide-y divide-slate-800">
-              {items.map((row) => (
-                <li key={row.id}>
-                  <div className="flex w-full items-center gap-3 py-2 text-left text-sm text-slate-200">
-                    <SportIcon sport={row.sport} className="h-5 w-5 shrink-0 [&>svg]:h-full [&>svg]:w-full" />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium" title={row.name}>{row.name}</div>
-                      <div className="text-xs text-slate-500">
-                        {formatDateTime(row.updated_at ?? row.created_at)}
+              {items.map((row) => {
+                const isActive = row.id === activeId;
+                const isLoading = row.id === loadingId;
+                return (
+                  <li key={row.id}>
+                    <button
+                      className={`flex w-full items-center gap-3 py-2 text-left text-sm transition-colors ${
+                        isActive ? "text-accent-400" : "text-slate-200 hover:text-accent-400"
+                      }`}
+                      onClick={() => handleClick(row.id)}
+                      disabled={isLoading}
+                    >
+                      <SportIcon sport={row.sport} className="h-5 w-5 shrink-0 [&>svg]:h-full [&>svg]:w-full" />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium" title={row.name}>{row.name}</div>
+                        <div className="text-xs text-slate-500">
+                          {formatDateTime(row.updated_at ?? row.created_at)}
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                </li>
-              ))}
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
