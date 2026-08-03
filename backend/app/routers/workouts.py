@@ -237,6 +237,11 @@ def update_workout(
     row.name = workout.name
     row.sport = workout.sport.value
     row.payload = workout.model_dump(mode="json")
+    # The saved content no longer matches whatever was last pushed (if
+    # anything) — clear the push markers so the "pushed" badge doesn't lie
+    # about this row being in sync with Garmin until it's pushed again.
+    row.pushed_at = None
+    row.garmin_workout_id = None
     db.commit()
     db.refresh(row)
     return _row_to_workout(row)

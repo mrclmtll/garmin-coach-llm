@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import tempfile
 from collections.abc import Iterator
+from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -139,6 +140,50 @@ def test_from_text_returns_422_when_ollama_unreachable(
     r = client.post("/workouts/from-text", json={"text": "easy 5k"})
     assert r.status_code == 422
     assert "detail" in r.json()
+
+
+def test_editing_a_pushed_workout_clears_pushed_status(client: TestClient) -> None:
+    """A previously-pushed workout that gets edited and saved no longer
+    matches what's on Garmin — the summary list's "pushed" badge must not
+    keep claiming it does until it's pushed again."""
+    workout = {
+        "name": "Easy Run",
+        "sport": "running",
+        "body": [
+            {
+                "kind": "step",
+                "label": "x",
+                "goal": {"kind": "time", "value": 600},
+                "target": {"kind": "hr_zone", "zone": 2},
+                "role": "work",
+                "sport": "running",
+            }
+        ],
+    }
+    created = client.post("/workouts", json={"workout": workout, "source": "manual"}).json()
+    workout_id = created["id"]
+
+    # Simulate a prior successful push directly on the row (bypassing the
+    # real Garmin call, which isn't exercised in these HTTP-level tests).
+    from app.db import SessionLocal
+    from app.models.workout import WorkoutRow
+
+    with SessionLocal() as db:
+        row = db.get(WorkoutRow, workout_id)
+        row.pushed_at = datetime.now(UTC)
+        row.garmin_workout_id = "999"
+        db.commit()
+
+    summary = next(w for w in client.get("/workouts").json() if w["id"] == workout_id)
+    assert summary["garmin_workout_id"] == "999"
+
+    workout["name"] = "Easy Run (edited)"
+    r = client.patch(f"/workouts/{workout_id}", json=workout)
+    assert r.status_code == 200
+
+    summary = next(w for w in client.get("/workouts").json() if w["id"] == workout_id)
+    assert summary["garmin_workout_id"] is None
+    assert summary["pushed_at"] is None
 
 
 def test_generate_from_text_does_not_persist(monkeypatch: pytest.MonkeyPatch) -> None:
