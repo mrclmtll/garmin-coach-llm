@@ -45,9 +45,12 @@ from app.schemas.workout import (
     HRZone,
     NoTarget,
     PaceRange,
+    PowerCurveInterval,
+    PowerCurveTarget,
     PowerRange,
     PowerZone,
     RepeatBlock,
+    SpeedRange,
     Sport,
     Step,
     StepRole,
@@ -121,7 +124,9 @@ _POWER_TARGET: dict[str, Any] = {
 }
 _CADENCE_TARGET: dict[str, Any] = {
     "workoutTargetTypeId": 3,
-    "workoutTargetTypeKey": "cadence.zone",
+    # Garmin's server normalizes this to "cadence" (not "cadence.zone")
+    # regardless of what's sent — confirmed by reading back a real push.
+    "workoutTargetTypeKey": "cadence",
     "displayOrder": 3,
 }
 # Same targetType for a predefined zone (zoneNumber) and a custom bpm range
@@ -139,6 +144,13 @@ _PACE_TARGET: dict[str, Any] = {
     "workoutTargetTypeKey": "pace.zone",
     "displayOrder": 6,
 }
+# Cycling's speed target — id confirmed via garminconnect's own TargetType
+# enum (SPEED_ZONE=5).
+_SPEED_TARGET: dict[str, Any] = {
+    "workoutTargetTypeId": 5,
+    "workoutTargetTypeKey": "speed.zone",
+    "displayOrder": 5,
+}
 # Confirmed against a workout created directly in Garmin Connect's own swim
 # editor (CSS-based target pace, "-2s" offset).
 _SWIM_CSS_TARGET: dict[str, Any] = {
@@ -151,6 +163,31 @@ _SWIM_INSTRUCTION_TARGET: dict[str, Any] = {
     "workoutTargetTypeId": 18,
     "workoutTargetTypeKey": "swim.instruction",
     "displayOrder": 18,
+}
+# Confirmed against a workout created directly in Garmin Connect's own
+# cycling editor (power curve, 20min/90% and 5s/10%). Unlike every other
+# target, the actual values live in step-level `powerCurveDuration` /
+# `powerCurveScale` fields, not targetValueOne/Two — `powerCurveRange` was
+# 10 in both observed examples and isn't exposed as an editable field in
+# the UI, so it's sent as a constant.
+_POWER_CURVE_TARGET: dict[str, Any] = {
+    "workoutTargetTypeId": 16,
+    "workoutTargetTypeKey": "power.curve",
+    "displayOrder": 16,
+}
+_POWER_CURVE_RANGE = 10
+_POWER_CURVE_SECONDS: dict[PowerCurveInterval, int] = {
+    PowerCurveInterval.SEC_5: 5,
+    PowerCurveInterval.SEC_10: 10,
+    PowerCurveInterval.SEC_20: 20,
+    PowerCurveInterval.SEC_30: 30,
+    PowerCurveInterval.MIN_1: 60,
+    PowerCurveInterval.MIN_2: 120,
+    PowerCurveInterval.MIN_5: 300,
+    PowerCurveInterval.MIN_10: 600,
+    PowerCurveInterval.MIN_20: 1200,
+    PowerCurveInterval.MIN_30: 1800,
+    PowerCurveInterval.HOUR_1: 3600,
 }
 
 
@@ -224,8 +261,41 @@ def _target_dict_and_values(target: Target) -> tuple[dict[str, Any], dict[str, A
             "secondaryTargetValueOne": float(_EFFORT_ID[target.level]),
             "secondaryTargetValueTwo": 0.0,
         }
+    if isinstance(target, SpeedRange):
+        # Unlike pace, higher speed = faster, so no min/max inversion.
+        return _SPEED_TARGET, {
+            "targetValueOne": target.min_kmh * 1000 / 3600,
+            "targetValueTwo": target.max_kmh * 1000 / 3600,
+        }
+    if isinstance(target, PowerCurveTarget):
+        return _POWER_CURVE_TARGET, {
+            "powerCurveDuration": _POWER_CURVE_SECONDS[target.interval],
+            "powerCurveScale": target.percent,
+            "powerCurveRange": _POWER_CURVE_RANGE,
+        }
     assert isinstance(target, NoTarget)
     return _NO_TARGET, {}
+
+
+def _secondary_target_fields(target: Target) -> dict[str, Any]:
+    """Same conversion as the primary target, but renamed onto Garmin's
+    "secondary" slot — confirmed for swim (which always sends this on the
+    secondary slot) and extended here for cycling's optional second target
+    (e.g. power zone + cadence stacked on one step)."""
+    if isinstance(target, PowerCurveTarget):
+        # Only ever observed as a *primary* target — there's no confirmed
+        # "secondary" shape for powerCurveDuration/Scale/Range, so fail
+        # loudly instead of guessing and silently sending something wrong.
+        raise ValueError("power curve is not supported as a secondary target")
+    type_dict, values = _target_dict_and_values(target)
+    out: dict[str, Any] = {"secondaryTargetType": type_dict}
+    if "targetValueOne" in values:
+        out["secondaryTargetValueOne"] = values["targetValueOne"]
+    if "targetValueTwo" in values:
+        out["secondaryTargetValueTwo"] = values["targetValueTwo"]
+    if "zoneNumber" in values:
+        out["secondaryZoneNumber"] = values["zoneNumber"]
+    return out
 
 
 # ---- duration estimation --------------------------------------------------
@@ -249,7 +319,7 @@ _FALLBACK_OPEN_ENDED_SECONDS = 300.0
 def _estimate_duration_seconds(goal: Goal, target: Target, sport: Sport) -> float:
     if goal.kind == "time":
         return float(goal.value)
-    if goal.kind in ("lap_button", "calories", "heart_rate"):
+    if goal.kind in ("lap_button", "calories", "heart_rate", "power"):
         return _FALLBACK_OPEN_ENDED_SECONDS
     # distance in meters
     if isinstance(target, PaceRange):
@@ -307,6 +377,12 @@ _END_CONDITION_HEART_RATE: dict[str, Any] = {
     "displayOrder": 6,
     "displayable": True,
 }
+_END_CONDITION_POWER: dict[str, Any] = {
+    "conditionTypeId": 5,
+    "conditionTypeKey": "power",
+    "displayOrder": 5,
+    "displayable": True,
+}
 _PREFERRED_UNIT_KM: dict[str, Any] = {
     "unitId": 2,
     "unitKey": "kilometer",
@@ -347,8 +423,11 @@ def _make_step(
     elif step.goal.kind == "calories":
         end_condition = _END_CONDITION_CALORIES
         end_condition_value = float(step.goal.value)
-    else:  # heart_rate
+    elif step.goal.kind == "heart_rate":
         end_condition = _END_CONDITION_HEART_RATE
+        end_condition_value = float(step.goal.value)
+    else:  # power
+        end_condition = _END_CONDITION_POWER
         end_condition_value = float(step.goal.value)
 
     type_key, type_id = _STEP_TYPE[step.role]
@@ -373,6 +452,12 @@ def _make_step(
         equip_id = _EQUIPMENT_ID[step.equipment]
         fields["equipmentType"] = {"equipmentTypeId": equip_id, "displayOrder": equip_id}
     fields.update(value_fields)
+    if step.secondary_target is not None:
+        # Cycling can stack a second target (e.g. power zone + cadence) onto
+        # one step. Swim targets already route themselves onto this same
+        # slot (see _target_dict_and_values) and never set secondary_target
+        # themselves, so there's no collision in practice.
+        fields.update(_secondary_target_fields(step.secondary_target))
 
     return ExecutableStep(**fields)
 

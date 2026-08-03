@@ -1,4 +1,4 @@
-import type { Goal, SwimEffort, SwimEquipment, SwimStroke, Sport, Step, StepRole, Target } from "../api/types";
+import type { Goal, PowerCurveInterval, SwimEffort, SwimEquipment, SwimStroke, Sport, Step, StepRole, Target } from "../api/types";
 
 // No target is a valid choice for every sport, so it's the sensible default
 // — no need to guess a sport-specific pace/power range upfront.
@@ -16,6 +16,7 @@ export function blankStep(sport: Sport, role: StepRole, label: string = ""): Ste
     sport,
     stroke: null,
     equipment: null,
+    secondary_target: null,
   };
 }
 
@@ -32,6 +33,7 @@ export function blankSwimPauseStep(): Step {
     sport: "swimming",
     stroke: null,
     equipment: null,
+    secondary_target: null,
   };
 }
 
@@ -58,7 +60,9 @@ export const STEP_ROLE_LABELS: Record<StepRole, string> = {
 };
 
 export function stepRoleLabel(role: StepRole, sport: Sport): string {
-  if (role === "work" && sport === "swimming") return "Swim";
+  if (role !== "work") return STEP_ROLE_LABELS[role];
+  if (sport === "swimming") return "Swim";
+  if (sport === "cycling") return "Ride";
   return STEP_ROLE_LABELS[role];
 }
 
@@ -80,6 +84,7 @@ export const GOAL_KIND_LABELS: Record<Goal["kind"], string> = {
   lap_button: "Lap Button Press",
   calories: "Calories",
   heart_rate: "Heart Rate",
+  power: "Power",
 };
 
 export const TARGET_KIND_LABELS: Record<Target["kind"], string> = {
@@ -93,6 +98,25 @@ export const TARGET_KIND_LABELS: Record<Target["kind"], string> = {
   swim_pace: "Target Pace",
   swim_css_pace: "CSS-Based Target Pace",
   swim_effort: "Effort-Based",
+  speed: "Speed",
+  power_curve: "Power Curve",
+};
+
+// Garmin's fixed set of power-curve interval durations — same 11 options as
+// the "Leistungskurveninterval" dropdown, confirmed against a workout
+// created directly in Garmin Connect's own cycling editor.
+export const POWER_CURVE_INTERVAL_LABELS: Record<PowerCurveInterval, string> = {
+  "5s": "5 sec",
+  "10s": "10 sec",
+  "20s": "20 sec",
+  "30s": "30 sec",
+  "1min": "1 min",
+  "2min": "2 min",
+  "5min": "5 min",
+  "10min": "10 min",
+  "20min": "20 min",
+  "30min": "30 min",
+  "1hour": "1 hour",
 };
 
 // Swimming only. Ids confirmed by round-tripping candidates through Garmin

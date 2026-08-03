@@ -24,7 +24,7 @@ export function formatSwimPace(secPer100m: number): string {
 }
 
 import type { Goal, Target } from "./types";
-import { SWIM_EFFORT_LABELS } from "../lib/steps";
+import { POWER_CURVE_INTERVAL_LABELS, SWIM_EFFORT_LABELS } from "../lib/steps";
 
 export function formatGoal(goal: Goal): string {
   if (goal.kind === "time") {
@@ -37,6 +37,7 @@ export function formatGoal(goal: Goal): string {
   }
   if (goal.kind === "lap_button") return "Lap button";
   if (goal.kind === "calories") return `${goal.value} kcal`;
+  if (goal.kind === "power") return `${goal.value} W`;
   return `HR ${goal.value} bpm`; // heart_rate
 }
 
@@ -64,5 +65,9 @@ export function formatTarget(target: Target): string {
     }
     case "swim_effort":
       return SWIM_EFFORT_LABELS[target.level];
+    case "speed":
+      return `${target.min_kmh}–${target.max_kmh} km/h`;
+    case "power_curve":
+      return `${target.percent}% of ${POWER_CURVE_INTERVAL_LABELS[target.interval]} power`;
   }
 }

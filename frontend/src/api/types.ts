@@ -12,7 +12,8 @@ export type Goal =
   | { kind: "distance"; value: number } // meters
   | { kind: "lap_button" } // open-ended: ends on lap-button press
   | { kind: "calories"; value: number } // kcal
-  | { kind: "heart_rate"; value: number }; // ends once heart rate reaches this bpm
+  | { kind: "heart_rate"; value: number } // ends once heart rate reaches this bpm
+  | { kind: "power"; value: number }; // cycling only — ends once power reaches this many watts
 
 export type Target =
   | { kind: "pace"; min_sec_per_km: number; max_sec_per_km: number }
@@ -24,7 +25,23 @@ export type Target =
   | { kind: "no_target" }
   | { kind: "swim_pace"; sec_per_100m: number } // single value, not a range
   | { kind: "swim_css_pace"; offset_seconds: number } // offset from the athlete's Critical Swim Speed
-  | { kind: "swim_effort"; level: SwimEffort }; // named exertion level, not a pace number
+  | { kind: "swim_effort"; level: SwimEffort } // named exertion level, not a pace number
+  | { kind: "speed"; min_kmh: number; max_kmh: number } // cycling only — ascending, unlike pace
+  | { kind: "power_curve"; interval: PowerCurveInterval; percent: number }; // % of the athlete's best-ever power for that duration
+
+// Garmin's fixed set of power-curve interval durations.
+export type PowerCurveInterval =
+  | "5s"
+  | "10s"
+  | "20s"
+  | "30s"
+  | "1min"
+  | "2min"
+  | "5min"
+  | "10min"
+  | "20min"
+  | "30min"
+  | "1hour";
 
 // Swim-only step fields. Garmin has no separate id for "drill" (Kick/Pull)
 // — the create-editor exposes it as an independent dropdown, but nobody has
@@ -63,6 +80,9 @@ export interface Step {
   sport: Sport;
   stroke: SwimStroke | null;
   equipment: SwimEquipment | null;
+  // Cycling only — a second target stacked alongside the primary one (e.g.
+  // power zone + cadence). null means unset.
+  secondary_target: Target | null;
 }
 
 export interface RepeatBlock {

@@ -68,8 +68,16 @@ class HeartRateGoal(BaseModel):
     value: int = Field(gt=0, le=250)  # bpm
 
 
+class PowerGoal(BaseModel):
+    """Cycling only — the step ends once power reaches this value (watts)."""
+
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["power"] = "power"
+    value: int = Field(gt=0)  # watts
+
+
 Goal = Annotated[
-    TimeGoal | DistanceGoal | LapButtonGoal | CaloriesGoal | HeartRateGoal,
+    TimeGoal | DistanceGoal | LapButtonGoal | CaloriesGoal | HeartRateGoal | PowerGoal,
     Field(discriminator="kind"),
 ]
 
@@ -124,6 +132,16 @@ class HRCustom(BaseModel):
     max_bpm: int = Field(gt=0, le=250)
 
 
+class SpeedRange(BaseModel):
+    """Cycling's speed target — a min/max range in km/h. Unlike pace, higher
+    is faster, so min/max follow plain ascending order (no inversion)."""
+
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["speed"] = "speed"
+    min_kmh: float = Field(gt=0)
+    max_kmh: float = Field(gt=0)
+
+
 class NoTarget(BaseModel):
     model_config = ConfigDict(extra="forbid")
     kind: Literal["no_target"] = "no_target"
@@ -174,6 +192,35 @@ class SwimEffortTarget(BaseModel):
     level: SwimEffort
 
 
+class PowerCurveInterval(StrEnum):
+    """Garmin's fixed set of power-curve interval durations — the same 11
+    options as the "Leistungskurveninterval" dropdown."""
+
+    SEC_5 = "5s"
+    SEC_10 = "10s"
+    SEC_20 = "20s"
+    SEC_30 = "30s"
+    MIN_1 = "1min"
+    MIN_2 = "2min"
+    MIN_5 = "5min"
+    MIN_10 = "10min"
+    MIN_20 = "20min"
+    MIN_30 = "30min"
+    HOUR_1 = "1hour"
+
+
+class PowerCurveTarget(BaseModel):
+    """Cycling's power curve target: ride at a percentage of the athlete's
+    best-ever average power for the chosen interval duration (Garmin's
+    personal power profile). Confirmed against a workout created directly
+    in Garmin Connect's own editor."""
+
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["power_curve"] = "power_curve"
+    interval: PowerCurveInterval
+    percent: float = Field(gt=0)  # free-text "Ziel (% des Intervalls)"
+
+
 Target = Annotated[
     PaceRange
     | PowerRange
@@ -184,7 +231,9 @@ Target = Annotated[
     | NoTarget
     | SwimPace
     | SwimCSSPace
-    | SwimEffortTarget,
+    | SwimEffortTarget
+    | SpeedRange
+    | PowerCurveTarget,
     Field(discriminator="kind"),
 ]
 
@@ -227,6 +276,9 @@ class Step(BaseModel):
     # Swimming only — None means "no stroke" / "no equipment" specified.
     stroke: SwimStroke | None = None
     equipment: SwimEquipment | None = None
+    # Cycling only — Garmin Connect lets you stack a second target (e.g.
+    # power zone + cadence) alongside the primary one. None means unset.
+    secondary_target: Target | None = None
 
 
 class RepeatBlock(BaseModel):
