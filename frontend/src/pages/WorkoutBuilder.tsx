@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   createWorkout,
   generateFromText,
@@ -44,6 +44,28 @@ export function WorkoutBuilder() {
   const [savedOpen, setSavedOpen] = useState(true);
   const [garminOpen, setGarminOpen] = useState(true);
   const { toasts, pushToast } = useToasts();
+
+  // Detects when the action bar has scrolled into its "stuck" (sticky)
+  // state so it can pick up its floating-bar styling only then — while in
+  // normal flow it stays visually merged into the name card above it. A
+  // sticky element's own top clamps to its `top-4` offset (16px) exactly
+  // once stuck, so that's the signal — cheaper than an IntersectionObserver
+  // and unaffected by observer throttling on backgrounded tabs.
+  const [actionBarStuck, setActionBarStuck] = useState(false);
+  const actionBarRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const bar = actionBarRef.current;
+    if (!bar) return;
+    const checkStuck = () => setActionBarStuck(bar.getBoundingClientRect().top <= 16);
+    checkStuck();
+    window.addEventListener("scroll", checkStuck, { passive: true });
+    window.addEventListener("resize", checkStuck);
+    return () => {
+      window.removeEventListener("scroll", checkStuck);
+      window.removeEventListener("resize", checkStuck);
+    };
+  }, [workout !== null]);
 
   // Source recorded on first save — mirrors how the workout was produced.
   const sourceForMode = () =>
@@ -289,44 +311,52 @@ export function WorkoutBuilder() {
 
       {workout && (
         <section className="space-y-3">
-          <div className="card space-y-3">
+          <div className="card rounded-b-none space-y-3">
             <label className="label">Name</label>
             <input
               className="input"
               value={workout.name}
               onChange={(e) => mutate({ ...workout, name: e.target.value })}
             />
-            <div className="flex flex-wrap items-center gap-3">
-              {!workout.warmup && (
-                <button className="btn-ghost" onClick={() => setStep("warmup", blankStep(workout.sport, "warmup"))}>
-                  + Add warmup
-                </button>
-              )}
-              {!workout.cooldown && (
-                <button className="btn-ghost" onClick={() => setStep("cooldown", blankStep(workout.sport, "cooldown"))}>
-                  + Add cooldown
-                </button>
-              )}
-              <AddSectionButton sport={workout.sport} onAdd={addBodyStep} />
-              <button className="btn-ghost" onClick={addRepeat}>+ Add repeat block</button>
-              {workout.sport === "swimming" && (
-                <label className="ml-auto flex items-center gap-2 text-sm text-slate-300">
-                  Pool length
-                  <input
-                    className="input w-20"
-                    type="number"
-                    min={1}
-                    value={workout.pool_length_m}
-                    onChange={(e) => mutate({ ...workout, pool_length_m: Number(e.target.value) })}
-                  />
-                  m
-                </label>
-              )}
-              <span className={`inline-flex items-center gap-2 rounded-full border border-slate-700 bg-surface-900 px-3 py-1.5 text-sm font-medium text-slate-200 ${workout.sport === "swimming" ? "" : "ml-auto"}`}>
-                <SportIcon sport={workout.sport} className="h-4 w-4 text-accent-400 [&>svg]:h-full [&>svg]:w-full" />
-                {SPORT_LABELS[workout.sport]}
-              </span>
-            </div>
+          </div>
+          <div
+            ref={actionBarRef}
+            style={{ marginTop: 0 }}
+            className={`sticky top-4 z-10 flex flex-wrap items-center gap-3 p-4 ${
+              actionBarStuck
+                ? "rounded-xl border border-white/10 bg-surface-800/50 shadow-lg backdrop-blur-md"
+                : "rounded-t-none rounded-b-xl border border-t-0 border-slate-800 bg-surface-800"
+            }`}
+          >
+            {!workout.warmup && (
+              <button className="btn-ghost" onClick={() => setStep("warmup", blankStep(workout.sport, "warmup"))}>
+                + Add warmup
+              </button>
+            )}
+            {!workout.cooldown && (
+              <button className="btn-ghost" onClick={() => setStep("cooldown", blankStep(workout.sport, "cooldown"))}>
+                + Add cooldown
+              </button>
+            )}
+            <AddSectionButton sport={workout.sport} onAdd={addBodyStep} />
+            <button className="btn-ghost" onClick={addRepeat}>+ Add repeat block</button>
+            {workout.sport === "swimming" && (
+              <label className="ml-auto flex items-center gap-2 text-sm text-slate-300">
+                Pool length
+                <input
+                  className="input w-20"
+                  type="number"
+                  min={1}
+                  value={workout.pool_length_m}
+                  onChange={(e) => mutate({ ...workout, pool_length_m: Number(e.target.value) })}
+                />
+                m
+              </label>
+            )}
+            <span className={`inline-flex items-center gap-2 rounded-full border border-slate-700 bg-surface-900 px-3 py-1.5 text-sm font-medium text-slate-200 ${workout.sport === "swimming" ? "" : "ml-auto"}`}>
+              <SportIcon sport={workout.sport} className="h-4 w-4 text-accent-400 [&>svg]:h-full [&>svg]:w-full" />
+              {SPORT_LABELS[workout.sport]}
+            </span>
           </div>
 
           {workout.warmup && (
