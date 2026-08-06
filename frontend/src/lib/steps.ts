@@ -10,10 +10,11 @@ export function defaultTarget(): Target {
 // so a new swim step defaults to a one-length distance goal instead of the
 // 5-minute time default used for running/cycling.
 export function blankStep(sport: Sport, role: StepRole, label: string = "", poolLengthM: number = 25): Step {
+  const validPoolLength = Number.isFinite(poolLengthM) && poolLengthM > 0 ? poolLengthM : 25;
   return {
     kind: "step",
     label,
-    goal: sport === "swimming" ? { kind: "distance", value: poolLengthM } : { kind: "time", value: 300 },
+    goal: sport === "swimming" ? { kind: "distance", value: validPoolLength } : { kind: "time", value: 300 },
     target: defaultTarget(),
     role,
     sport,
@@ -56,9 +57,15 @@ export function blankSwimBlock(poolLengthM: number = 25): Step[] {
 // itself a clean multiple (e.g. a workout authored outside this app, or a
 // pool length changed after the step was created), is folded in so the
 // dropdown never silently drops the step's actual value.
+//
+// `poolLengthM` and `currentValue` come from user-editable number inputs
+// upstream, so both are guarded against non-finite/non-positive values
+// (e.g. a momentarily empty pool-length field) rather than trusted as-is —
+// letting either through would otherwise generate NaN options.
 export function swimDistanceOptions(poolLengthM: number, currentValue?: number): number[] {
-  const lengths = Array.from({ length: 80 }, (_, i) => poolLengthM * (i + 1));
-  if (currentValue != null && !lengths.includes(currentValue)) {
+  const base = Number.isFinite(poolLengthM) && poolLengthM > 0 ? poolLengthM : 25;
+  const lengths = Array.from({ length: 80 }, (_, i) => base * (i + 1));
+  if (currentValue != null && Number.isFinite(currentValue) && currentValue > 0 && !lengths.includes(currentValue)) {
     lengths.push(currentValue);
     lengths.sort((a, b) => a - b);
   }

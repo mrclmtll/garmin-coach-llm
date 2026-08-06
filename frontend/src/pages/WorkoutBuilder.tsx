@@ -348,7 +348,15 @@ export function WorkoutBuilder() {
                   type="number"
                   min={1}
                   value={workout.pool_length_m}
-                  onChange={(e) => mutate({ ...workout, pool_length_m: Number(e.target.value) })}
+                  onChange={(e) => {
+                    // Ignore empty/invalid intermediate typing states (e.g.
+                    // clearing the field to retype) rather than storing 0 or
+                    // NaN, which would otherwise cascade into swim distance
+                    // dropdowns — see swimDistanceOptions in lib/steps.
+                    const value = Number(e.target.value);
+                    if (!Number.isFinite(value) || value <= 0) return;
+                    mutate({ ...workout, pool_length_m: value });
+                  }}
                 />
                 m
               </label>
