@@ -244,7 +244,7 @@ export function WorkoutBuilder() {
         ...workout.body,
         {
           kind: "repeat", count: 4,
-          steps: isSwim ? blankSwimBlock() : [blankStep(workout.sport, "work")],
+          steps: isSwim ? blankSwimBlock(workout.pool_length_m) : [blankStep(workout.sport, "work")],
         },
         // A repeat block of swim sets is still followed by one more rest.
         ...(isSwim ? [blankSwimPauseStep()] : []),
@@ -329,16 +329,16 @@ export function WorkoutBuilder() {
             }`}
           >
             {!workout.warmup && (
-              <button className="btn-ghost" onClick={() => setStep("warmup", blankStep(workout.sport, "warmup"))}>
+              <button className="btn-ghost" onClick={() => setStep("warmup", blankStep(workout.sport, "warmup", "", workout.pool_length_m))}>
                 + Add warmup
               </button>
             )}
             {!workout.cooldown && (
-              <button className="btn-ghost" onClick={() => setStep("cooldown", blankStep(workout.sport, "cooldown"))}>
+              <button className="btn-ghost" onClick={() => setStep("cooldown", blankStep(workout.sport, "cooldown", "", workout.pool_length_m))}>
                 + Add cooldown
               </button>
             )}
-            <AddSectionButton sport={workout.sport} onAdd={addBodyStep} />
+            <AddSectionButton sport={workout.sport} poolLengthM={workout.pool_length_m} onAdd={addBodyStep} />
             <button className="btn-ghost" onClick={addRepeat}>+ Add repeat block</button>
             {workout.sport === "swimming" && (
               <label className="ml-auto flex items-center gap-2 text-sm text-slate-300">
@@ -360,7 +360,7 @@ export function WorkoutBuilder() {
           </div>
 
           {workout.warmup && (
-            <StepCard step={workout.warmup} onChange={(s) => setStep("warmup", s)} onRemove={() => setStep("warmup", null)} />
+            <StepCard step={workout.warmup} poolLengthM={workout.pool_length_m} onChange={(s) => setStep("warmup", s)} onRemove={() => setStep("warmup", null)} />
           )}
           {workout.body.map((item, i) => (
             <div
@@ -380,15 +380,21 @@ export function WorkoutBuilder() {
               </div>
               <div className="min-w-0 flex-1">
                 {item.kind === "step" ? (
-                  <StepCard step={item} onChange={(s) => updateBody(i, s)} onRemove={() => removeBody(i)} />
+                  <StepCard step={item} poolLengthM={workout.pool_length_m} onChange={(s) => updateBody(i, s)} onRemove={() => removeBody(i)} />
                 ) : (
-                  <RepeatBlockView block={item} sport={workout.sport} onChange={(b) => updateBody(i, b)} onRemove={() => removeBody(i)} />
+                  <RepeatBlockView
+                    block={item}
+                    sport={workout.sport}
+                    poolLengthM={workout.pool_length_m}
+                    onChange={(b) => updateBody(i, b)}
+                    onRemove={() => removeBody(i)}
+                  />
                 )}
               </div>
             </div>
           ))}
           {workout.cooldown && (
-            <StepCard step={workout.cooldown} onChange={(s) => setStep("cooldown", s)} onRemove={() => setStep("cooldown", null)} />
+            <StepCard step={workout.cooldown} poolLengthM={workout.pool_length_m} onChange={(s) => setStep("cooldown", s)} onRemove={() => setStep("cooldown", null)} />
           )}
 
           <div className="sticky bottom-4 z-10 mx-6 flex items-center gap-3 rounded-xl border border-white/10 bg-surface-800/50 p-4 shadow-lg backdrop-blur-md">

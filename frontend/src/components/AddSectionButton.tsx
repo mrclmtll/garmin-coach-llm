@@ -10,10 +10,11 @@ const ROLE_KEYS = Object.keys(STEP_ROLE_LABELS) as StepRole[];
 
 interface Props {
   sport: Sport;
+  poolLengthM: number;
   onAdd: (steps: Step[]) => void;
 }
 
-export function AddSectionButton({ sport, onAdd }: Props) {
+export function AddSectionButton({ sport, poolLengthM, onAdd }: Props) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -31,7 +32,11 @@ export function AddSectionButton({ sport, onAdd }: Props) {
   const choose = (role: StepRole) => {
     setOpen(false);
     // A swim block is always a Swim step followed by a rest-until-lap.
-    onAdd(sport === "swimming" && role === "work" ? blankSwimBlock() : [blankStep(sport, role)]);
+    onAdd(
+      sport === "swimming" && role === "work"
+        ? blankSwimBlock(poolLengthM)
+        : [blankStep(sport, role, "", poolLengthM)],
+    );
   };
 
   return (

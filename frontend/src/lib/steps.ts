@@ -6,11 +6,14 @@ export function defaultTarget(): Target {
   return { kind: "no_target" };
 }
 
-export function blankStep(sport: Sport, role: StepRole, label: string = ""): Step {
+// Swimming sets are conventionally described in pool lengths, not seconds —
+// so a new swim step defaults to a one-length distance goal instead of the
+// 5-minute time default used for running/cycling.
+export function blankStep(sport: Sport, role: StepRole, label: string = "", poolLengthM: number = 25): Step {
   return {
     kind: "step",
     label,
-    goal: { kind: "time", value: 300 },
+    goal: sport === "swimming" ? { kind: "distance", value: poolLengthM } : { kind: "time", value: 300 },
     target: defaultTarget(),
     role,
     sport,
@@ -41,8 +44,25 @@ export function blankSwimPauseStep(): Step {
 
 // A swim block is a Swim step immediately followed by a rest-until-lap —
 // this is what every "add a swim section" entry point produces.
-export function blankSwimBlock(): Step[] {
-  return [blankStep("swimming", "work"), blankSwimPauseStep()];
+export function blankSwimBlock(poolLengthM: number = 25): Step[] {
+  return [blankStep("swimming", "work", "", poolLengthM), blankSwimPauseStep()];
+}
+
+// Swim distances are conventionally chosen as whole numbers of pool
+// lengths, not arbitrary meters — so the distance goal is a dropdown of
+// multiples of the pool length rather than a free-typed number. Capped at
+// 80 lengths (2000m in a 25m pool, 4000m in a 50m pool), comfortably past
+// any realistic single-step distance. `currentValue`, if given and not
+// itself a clean multiple (e.g. a workout authored outside this app, or a
+// pool length changed after the step was created), is folded in so the
+// dropdown never silently drops the step's actual value.
+export function swimDistanceOptions(poolLengthM: number, currentValue?: number): number[] {
+  const lengths = Array.from({ length: 80 }, (_, i) => poolLengthM * (i + 1));
+  if (currentValue != null && !lengths.includes(currentValue)) {
+    lengths.push(currentValue);
+    lengths.sort((a, b) => a - b);
+  }
+  return lengths;
 }
 
 // Garmin's own labels for the "Step Type" dropdown. Garmin Connect's own

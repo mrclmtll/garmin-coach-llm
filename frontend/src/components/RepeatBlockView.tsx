@@ -6,17 +6,21 @@ import { StepCard } from "./StepCard";
 interface Props {
   block: RepeatBlock;
   sport: Sport;
+  poolLengthM: number;
   onChange: (next: RepeatBlock) => void;
   onRemove: () => void;
 }
 
-export function RepeatBlockView({ block, sport, onChange, onRemove }: Props) {
+export function RepeatBlockView({ block, sport, poolLengthM, onChange, onRemove }: Props) {
   const updateStep = (i: number, next: Step) =>
     onChange({ ...block, steps: block.steps.map((s, idx) => (idx === i ? next : s)) });
   const removeStep = (i: number) =>
     onChange({ ...block, steps: block.steps.filter((_, idx) => idx !== i) });
   const addStep = () =>
-    onChange({ ...block, steps: [...block.steps, ...(sport === "swimming" ? blankSwimBlock() : [blankStep(sport, "work")])] });
+    onChange({
+      ...block,
+      steps: [...block.steps, ...(sport === "swimming" ? blankSwimBlock(poolLengthM) : [blankStep(sport, "work")])],
+    });
   const moveStep = (from: number, to: number) => {
     if (from === to) return;
     const next = [...block.steps];
@@ -61,7 +65,7 @@ export function RepeatBlockView({ block, sport, onChange, onRemove }: Props) {
               ⠿
             </div>
             <div className="min-w-0 flex-1">
-              <StepCard step={s} onChange={(next) => updateStep(i, next)} onRemove={() => removeStep(i)} />
+              <StepCard step={s} poolLengthM={poolLengthM} onChange={(next) => updateStep(i, next)} onRemove={() => removeStep(i)} />
             </div>
           </div>
         ))}

@@ -4,6 +4,7 @@ import {
   GOAL_KIND_LABELS,
   STEP_ROLE_STYLES,
   stepRoleLabel,
+  swimDistanceOptions,
   SWIM_DRILL_TYPE_LABELS,
   SWIM_EQUIPMENT_LABELS,
   SWIM_STROKE_LABELS,
@@ -12,6 +13,7 @@ import { TargetEditor } from "./TargetEditor";
 
 interface Props {
   step: Step;
+  poolLengthM: number;
   onChange: (next: Step) => void;
   onRemove: () => void;
 }
@@ -82,10 +84,18 @@ function defaultGoalForKind(kind: Goal["kind"], current: Goal): Goal {
   }
 }
 
-export function StepCard({ step, onChange, onRemove }: Props) {
+export function StepCard({ step, poolLengthM, onChange, onRemove }: Props) {
   const set = <K extends keyof Step>(key: K, value: Step[K]) => onChange({ ...step, [key]: value });
 
-  const setGoalKind = (kind: Goal["kind"]) => onChange({ ...step, goal: defaultGoalForKind(kind, step.goal) });
+  const setGoalKind = (kind: Goal["kind"]) => {
+    // Swim distances default to one pool length rather than the generic
+    // 1000m used for running/cycling — see blankStep in lib/steps.
+    if (kind === "distance" && step.sport === "swimming" && step.goal.kind !== "distance") {
+      onChange({ ...step, goal: { kind: "distance", value: poolLengthM } });
+      return;
+    }
+    onChange({ ...step, goal: defaultGoalForKind(kind, step.goal) });
+  };
 
   // Clearing the primary target also clears the secondary one — Garmin
   // grays out "Sekundäres Ziel" whenever no primary target is selected.
@@ -149,16 +159,28 @@ export function StepCard({ step, onChange, onRemove }: Props) {
               {step.goal.kind === "heart_rate" && "Target bpm"}
               {step.goal.kind === "power" && "Target watts"}
             </label>
-            <input
-              className="input"
-              type="number"
-              min={0}
-              value={step.goal.value}
-              onChange={(e) => {
-                if (step.goal.kind === "lap_button") return;
-                onChange({ ...step, goal: { ...step.goal, value: Number(e.target.value) } });
-              }}
-            />
+            {step.sport === "swimming" && step.goal.kind === "distance" ? (
+              <select
+                className="input"
+                value={step.goal.value}
+                onChange={(e) => onChange({ ...step, goal: { kind: "distance", value: Number(e.target.value) } })}
+              >
+                {swimDistanceOptions(poolLengthM, step.goal.value).map((m) => (
+                  <option key={m} value={m}>{m} m</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                className="input"
+                type="number"
+                min={0}
+                value={step.goal.value}
+                onChange={(e) => {
+                  if (step.goal.kind === "lap_button") return;
+                  onChange({ ...step, goal: { ...step.goal, value: Number(e.target.value) } });
+                }}
+              />
+            )}
           </div>
         )}
       </div>
