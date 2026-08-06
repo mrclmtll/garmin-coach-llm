@@ -60,6 +60,7 @@ from app.schemas.workout import (
     Step,
     StepRole,
     SwimCSSPace,
+    SwimDrillType,
     SwimEffort,
     SwimEffortTarget,
     SwimEquipment,
@@ -114,6 +115,13 @@ _EQUIPMENT_ID: dict[SwimEquipment, int] = {
     SwimEquipment.PADDLES: 3,
     SwimEquipment.PULL_BUOY: 4,
     SwimEquipment.SNORKEL: 5,
+}
+# Confirmed by pushing a real workout and checking it in Garmin Connect's
+# own editor (see SwimDrillType docstring).
+_DRILL_ID: dict[SwimDrillType, int] = {
+    SwimDrillType.KICK: 1,
+    SwimDrillType.PULL: 2,
+    SwimDrillType.DRILL: 3,
 }
 
 # ---- target conversion ----------------------------------------------------
@@ -457,6 +465,9 @@ def _make_step(
     if step.equipment is not None:
         equip_id = _EQUIPMENT_ID[step.equipment]
         fields["equipmentType"] = {"equipmentTypeId": equip_id, "displayOrder": equip_id}
+    if step.drill is not None:
+        drill_id = _DRILL_ID[step.drill]
+        fields["drillType"] = {"drillTypeId": drill_id, "displayOrder": drill_id}
     fields.update(value_fields)
     if step.secondary_target is not None:
         # Cycling can stack a second target (e.g. power zone + cadence) onto
@@ -598,6 +609,7 @@ _STEP_TYPE_KEY_TO_ROLE["main"] = StepRole.WORK
 
 _STROKE_ID_REV: dict[int, SwimStroke] = {v: k for k, v in _STROKE_ID.items()}
 _EQUIPMENT_ID_REV: dict[int, SwimEquipment] = {v: k for k, v in _EQUIPMENT_ID.items()}
+_DRILL_ID_REV: dict[int, SwimDrillType] = {v: k for k, v in _DRILL_ID.items()}
 _EFFORT_ID_REV: dict[int, SwimEffort] = {v: k for k, v in _EFFORT_ID.items()}
 _POWER_CURVE_SECONDS_REV: dict[int, PowerCurveInterval] = {v: k for k, v in _POWER_CURVE_SECONDS.items()}
 
@@ -715,6 +727,11 @@ def _equipment_from_raw_step(raw_step: dict[str, Any]) -> SwimEquipment | None:
     return _EQUIPMENT_ID_REV.get(equipment_id) if equipment_id else None
 
 
+def _drill_from_raw_step(raw_step: dict[str, Any]) -> SwimDrillType | None:
+    drill_id = (raw_step.get("drillType") or {}).get("drillTypeId")
+    return _DRILL_ID_REV.get(drill_id) if drill_id else None
+
+
 def _step_from_raw(raw_step: dict[str, Any], sport: Sport) -> Step:
     role_key = (raw_step.get("stepType") or {}).get("stepTypeKey")
     role = _STEP_TYPE_KEY_TO_ROLE.get(role_key or "", StepRole.OTHER)
@@ -727,6 +744,7 @@ def _step_from_raw(raw_step: dict[str, Any], sport: Sport) -> Step:
         sport=sport,
         stroke=_stroke_from_raw_step(raw_step) if sport == Sport.SWIMMING else None,
         equipment=_equipment_from_raw_step(raw_step) if sport == Sport.SWIMMING else None,
+        drill=_drill_from_raw_step(raw_step) if sport == Sport.SWIMMING else None,
         secondary_target=secondary_target,
     )
 
@@ -763,7 +781,7 @@ def from_garmin_workout(raw: dict[str, Any]) -> Workout:
     `get_workout_by_id`) back into our internal Workout.
 
     Inverse of `to_garmin_workout` — but necessarily lossy for fields our
-    model doesn't represent (e.g. `drillType`), since this also has to
+    model doesn't represent (e.g. `exerciseName`), since this also has to
     accept workouts authored directly in Garmin Connect's own editor, not
     just ones this app produced.
     """

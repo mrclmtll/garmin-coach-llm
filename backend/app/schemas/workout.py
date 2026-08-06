@@ -264,6 +264,17 @@ class SwimEquipment(StrEnum):
     SNORKEL = "snorkel"  # 5
 
 
+class SwimDrillType(StrEnum):
+    """Garmin's "Übungstyp" (exercise type) dropdown — a separate field from
+    stroke/equipment. Ids confirmed by pushing a real workout and checking
+    it in Garmin Connect's own editor, the same way as SwimStroke and
+    SwimEquipment above."""
+
+    KICK = "kick"  # 1 ("Beinschlag")
+    PULL = "pull"  # 2 ("Armzug")
+    DRILL = "drill"  # 3 ("Übung")
+
+
 class Step(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -273,9 +284,11 @@ class Step(BaseModel):
     target: Target
     role: StepRole
     sport: Sport
-    # Swimming only — None means "no stroke" / "no equipment" specified.
+    # Swimming only — None means "no stroke" / "no equipment" / "no drill
+    # type" specified.
     stroke: SwimStroke | None = None
     equipment: SwimEquipment | None = None
+    drill: SwimDrillType | None = None
     # Cycling only — Garmin Connect lets you stack a second target (e.g.
     # power zone + cadence) alongside the primary one. None means unset.
     secondary_target: Target | None = None

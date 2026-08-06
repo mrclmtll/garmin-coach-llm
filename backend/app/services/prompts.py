@@ -26,7 +26,8 @@ SCHEMA_DESCRIPTION: str = dedent(
       "sport": "running" | "cycling" | "swimming",
       "warmup":  <Step> | null,
       "body":    [ <Step> | <RepeatBlock>, ... ],
-      "cooldown": <Step> | null
+      "cooldown": <Step> | null,
+      "pool_length_m": <meters>  // swimming only; default 25
     }
 
     Step:
@@ -41,19 +42,54 @@ SCHEMA_DESCRIPTION: str = dedent(
           | { "kind": "calories",   "value": <kcal> }
           | { "kind": "heart_rate", "value": <bpm> }
               // ends once heart rate reaches this value
+          | { "kind": "power",      "value": <watts> }
+              // cycling only — ends once power reaches this value
         "target":
           { "kind": "pace",       "min_sec_per_km": <sec>, "max_sec_per_km": <sec> }
-              // running, swimming
+              // running only
+          | { "kind": "swim_pace", "sec_per_100m": <sec> }
+              // swimming — a single pace value, not a range
+          | { "kind": "swim_css_pace", "offset_seconds": <sec> }
+              // swimming — offset (+/-/0) from the athlete's Critical Swim Speed
+          | { "kind": "swim_effort", "level": <SwimEffortLevel> }
+              // swimming — named exertion level instead of a pace number.
+              // SwimEffortLevel: "recovery"|"easy"|"moderate"|"hard"
+              // |"very_hard"|"maximum"|"ascending"|"descending"
           | { "kind": "power",      "min_watts": <w>, "max_watts": <w> }
               // cycling — custom watt range
           | { "kind": "power_zone", "zone": 1|2|3|4|5|6|7 }
               // cycling — predefined power zone
+          | { "kind": "power_curve", "interval": <PowerCurveInterval>, "percent": <percent> }
+              // cycling — % of the athlete's best-ever power for that
+              // interval duration. PowerCurveInterval: "5s"|"10s"|"20s"
+              // |"30s"|"1min"|"2min"|"5min"|"10min"|"20min"|"30min"|"1hour"
+          | { "kind": "speed",      "min_kmh": <kmh>, "max_kmh": <kmh> }
+              // cycling — speed range in km/h
           | { "kind": "cadence",    "min_cadence": <spm|rpm>, "max_cadence": <spm|rpm> }
+              // running (spm) or cycling (rpm)
           | { "kind": "hr_zone",    "zone": 1|2|3|4|5 }
           | { "kind": "hr_custom",  "min_bpm": <bpm>, "max_bpm": <bpm> }
           | { "kind": "no_target" },
         "role": "warmup" | "work" | "recovery" | "rest" | "other" | "cooldown",
-        "sport": "running" | "cycling" | "swimming"
+        "sport": "running" | "cycling" | "swimming",
+        "stroke": <SwimStroke> | null,
+            // swimming only — set this whenever the description names a
+            // stroke (e.g. "freestyle", "backstroke", "kraul", "IM").
+            // SwimStroke: "choice"|"backstroke"|"breaststroke"|"butterfly"
+            // |"freestyle"|"im"|"various"|"im_ladder"|"im_reverse". null
+            // means unspecified ("Wahl"), not "freestyle" — never guess a
+            // stroke the text doesn't mention.
+        "equipment": "fins"|"kickboard"|"paddles"|"pull_buoy"|"snorkel"|null,
+            // swimming only — set when the description names swim gear
+            // (fins, kickboard/board, paddles, pull buoy, snorkel).
+        "drill": "kick"|"pull"|"drill"|null,
+            // swimming only — Garmin's "exercise type". Set "kick" for a
+            // kick-only set, "pull" for a pull-only set (arms only, often
+            // with a pull buoy), "drill" for a named technique drill. null
+            // for normal swimming.
+        "secondary_target": <Target> | null
+            // cycling only — a second target stacked on the primary one
+            // (e.g. power zone + cadence). Rarely needed; null by default.
       }
 
     RepeatBlock:
@@ -61,10 +97,11 @@ SCHEMA_DESCRIPTION: str = dedent(
 
     Rules:
     - Use "kind" as the literal discriminator on every body item, goal, and target.
-    - Pace is in seconds per kilometer (running/swimming).
+    - Pace is in seconds per kilometer (running) or per 100m (swimming, via "swim_pace").
     - Choose the target type that matches the sport. Default to "pace" for
-      running/swimming and "power" for cycling unless the description asks
-      for cadence, a heart-rate target, or explicitly says "no target".
+      running, "swim_pace" for swimming, and "power" for cycling unless the
+      description asks for cadence, a heart-rate target, or explicitly says
+      "no target".
     - Default to a "time" or "distance" goal. Only use "lap_button",
       "calories", or "heart_rate" goals when the description explicitly
       asks for one of those (e.g. "until lap button", "until 300 kcal",
@@ -73,6 +110,13 @@ SCHEMA_DESCRIPTION: str = dedent(
       are different Garmin step types — pick "rest" only when the
       description clearly means a full stop or walk, not an easy jog.
     - Repeat blocks should be used when the description has a "Nx" pattern.
+    - For swimming, always set "stroke" on a step when the description names
+      one, and leave it null otherwise — don't default every step to
+      "freestyle".
+    - For swimming, set "drill" to "kick" or "pull" when the description
+      calls for a kick-only or pull-only set, and "drill" for a named
+      technique drill (e.g. catch-up, fingertip drag); leave it null for
+      normal swimming.
 
     Pace formatting:
     - Pace is a small number of seconds per km. Faster running = SMALLER

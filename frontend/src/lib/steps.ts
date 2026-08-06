@@ -1,4 +1,4 @@
-import type { Goal, PowerCurveInterval, SwimEffort, SwimEquipment, SwimStroke, Sport, Step, StepRole, Target } from "../api/types";
+import type { Goal, PowerCurveInterval, SwimDrillType, SwimEffort, SwimEquipment, SwimStroke, Sport, Step, StepRole, Target } from "../api/types";
 
 // No target is a valid choice for every sport, so it's the sensible default
 // — no need to guess a sport-specific pace/power range upfront.
@@ -16,6 +16,7 @@ export function blankStep(sport: Sport, role: StepRole, label: string = ""): Ste
     sport,
     stroke: null,
     equipment: null,
+    drill: null,
     secondary_target: null,
   };
 }
@@ -33,6 +34,7 @@ export function blankSwimPauseStep(): Step {
     sport: "swimming",
     stroke: null,
     equipment: null,
+    drill: null,
     secondary_target: null,
   };
 }
@@ -140,6 +142,15 @@ export const SWIM_EQUIPMENT_LABELS: Record<SwimEquipment, string> = {
   paddles: "Paddles",
   pull_buoy: "Pull Buoy",
   snorkel: "Snorkel",
+};
+
+// Garmin's "Übungstyp" (exercise type) dropdown — separate from stroke and
+// equipment. Ids confirmed against Garmin Connect's own editor (see backend
+// docstring).
+export const SWIM_DRILL_TYPE_LABELS: Record<SwimDrillType, string> = {
+  kick: "Kick",
+  pull: "Pull",
+  drill: "Drill",
 };
 
 // Effort-based swim target levels. Ids confirmed by round-tripping all 8

@@ -1,9 +1,10 @@
-import type { Goal, Step, SwimEquipment, SwimStroke, Target } from "../api/types";
+import type { Goal, Step, SwimDrillType, SwimEquipment, SwimStroke, Target } from "../api/types";
 import { formatGoal, formatTarget } from "../api/format";
 import {
   GOAL_KIND_LABELS,
   STEP_ROLE_STYLES,
   stepRoleLabel,
+  SWIM_DRILL_TYPE_LABELS,
   SWIM_EQUIPMENT_LABELS,
   SWIM_STROKE_LABELS,
 } from "../lib/steps";
@@ -18,6 +19,7 @@ interface Props {
 const ROLES = ["warmup", "work", "recovery", "rest", "other", "cooldown"] as const;
 const STROKES = ["choice", "freestyle", "backstroke", "breaststroke", "butterfly", "im", "im_ladder", "im_reverse", "various"] as const;
 const EQUIPMENT = ["fins", "kickboard", "paddles", "pull_buoy", "snorkel"] as const;
+const DRILL_TYPES = ["kick", "pull", "drill"] as const;
 // Swimming has no calories/heart_rate/power end condition. Cycling adds
 // power (ends once power reaches a threshold) on top of the running set.
 const GOAL_KINDS_BY_SPORT: Record<Step["sport"], Goal["kind"][]> = {
@@ -162,7 +164,7 @@ export function StepCard({ step, onChange, onRemove }: Props) {
       </div>
 
       {step.sport === "swimming" && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <div>
             <label className="label">Stroke</label>
             <select
@@ -172,6 +174,17 @@ export function StepCard({ step, onChange, onRemove }: Props) {
             >
               <option value="">—</option>
               {STROKES.map((s) => <option key={s} value={s}>{SWIM_STROKE_LABELS[s]}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label">Exercise Type</label>
+            <select
+              className="input"
+              value={step.drill ?? ""}
+              onChange={(e) => set("drill", (e.target.value || null) as SwimDrillType | null)}
+            >
+              <option value="">—</option>
+              {DRILL_TYPES.map((d) => <option key={d} value={d}>{SWIM_DRILL_TYPE_LABELS[d]}</option>)}
             </select>
           </div>
           <div>

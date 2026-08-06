@@ -43,9 +43,7 @@ export type PowerCurveInterval =
   | "30min"
   | "1hour";
 
-// Swim-only step fields. Garmin has no separate id for "drill" (Kick/Pull)
-// — the create-editor exposes it as an independent dropdown, but nobody has
-// reverse-engineered its JSON shape yet, so it isn't modeled here.
+// Swim-only step fields.
 export type SwimStroke =
   | "choice"
   | "backstroke"
@@ -71,6 +69,11 @@ export type SwimEffort =
 
 export type SwimEquipment = "fins" | "kickboard" | "paddles" | "pull_buoy" | "snorkel";
 
+// Garmin's "Übungstyp" (exercise type) dropdown — separate from stroke and
+// equipment. Ids confirmed against Garmin Connect's own editor (see backend
+// docstring).
+export type SwimDrillType = "kick" | "pull" | "drill";
+
 export interface Step {
   kind: "step";
   label: string;
@@ -80,6 +83,7 @@ export interface Step {
   sport: Sport;
   stroke: SwimStroke | null;
   equipment: SwimEquipment | null;
+  drill: SwimDrillType | null;
   // Cycling only — a second target stacked alongside the primary one (e.g.
   // power zone + cadence). null means unset.
   secondary_target: Target | null;
