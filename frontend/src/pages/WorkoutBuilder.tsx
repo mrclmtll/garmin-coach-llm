@@ -322,7 +322,7 @@ export function WorkoutBuilder() {
           <div
             ref={actionBarRef}
             style={{ marginTop: 0 }}
-            className={`sticky top-4 z-10 flex flex-wrap items-center gap-3 p-4 ${
+            className={`sticky top-4 z-20 flex flex-wrap items-center gap-3 p-4 ${
               actionBarStuck
                 ? "rounded-xl border border-white/10 bg-surface-800/50 shadow-lg backdrop-blur-md"
                 : "rounded-t-none rounded-b-xl border border-t-0 border-slate-800 bg-surface-800"
