@@ -35,7 +35,7 @@ function PaceInput({ totalSeconds, onChange, disabled }: PaceInputProps) {
   return (
     <div className="flex w-16 items-center justify-center gap-0.5 rounded-md border border-slate-700 bg-surface-900 px-1.5 py-2 focus-within:border-accent-500">
       <input
-        className="w-5 min-w-0 bg-transparent text-right text-sm text-slate-100 [appearance:textfield] focus:outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        className="w-5 min-w-0 bg-transparent text-right text-sm text-slate-100 focus:outline-none"
         type="number"
         min={0}
         disabled={disabled}
@@ -44,7 +44,7 @@ function PaceInput({ totalSeconds, onChange, disabled }: PaceInputProps) {
       />
       <span className="text-sm text-slate-500">:</span>
       <input
-        className="w-6 min-w-0 bg-transparent text-sm text-slate-100 [appearance:textfield] focus:outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        className="w-6 min-w-0 bg-transparent text-sm text-slate-100 focus:outline-none"
         type="number"
         min={0}
         max={59}
