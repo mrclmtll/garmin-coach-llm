@@ -8,6 +8,7 @@ import {
 } from "../api/client";
 import type { Sport, Step, Workout, WorkoutTemplate } from "../api/types";
 import { AddSectionButton } from "../components/AddSectionButton";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { GarminWorkouts } from "../components/GarminWorkouts";
 import type { PushTarget } from "../components/PushButton";
 import { PushButton } from "../components/PushButton";
@@ -191,6 +192,21 @@ export function WorkoutBuilder() {
     setGarminWorkoutId(id);
     setDirty(false);
     setError(null);
+  };
+
+  // Holds a load that's waiting on the user to confirm discarding unsaved
+  // changes; null means no confirmation is pending.
+  const [pendingLoad, setPendingLoad] = useState<(() => void) | null>(null);
+
+  // Wraps loadWorkout/loadGarminWorkout so switching to a different saved
+  // workout while the current one has unsaved edits asks for confirmation
+  // first instead of silently discarding them.
+  const confirmDiscardThen = (action: () => void) => {
+    if (dirty) {
+      setPendingLoad(() => action);
+    } else {
+      action();
+    }
   };
 
   // Replaces the Garmin-side workout in place with the edited version — the
@@ -438,18 +454,30 @@ export function WorkoutBuilder() {
         <SavedWorkouts
           refreshKey={refreshKey}
           activeId={workoutId}
-          onLoad={loadWorkout}
+          onLoad={(id, w) => confirmDiscardThen(() => loadWorkout(id, w))}
           open={savedOpen}
           onToggle={() => setSavedOpen((v) => !v)}
         />
         <GarminWorkouts
           refreshKey={refreshKey}
           activeId={garminWorkoutId}
-          onLoad={loadGarminWorkout}
+          onLoad={(id, w) => confirmDiscardThen(() => loadGarminWorkout(id, w))}
           open={garminOpen}
           onToggle={() => setGarminOpen((v) => !v)}
         />
       </aside>
+      {pendingLoad && (
+        <ConfirmDialog
+          title="Discard unsaved changes?"
+          message="This workout has unsaved changes. Loading another workout will discard them."
+          confirmLabel="Discard changes"
+          onConfirm={() => {
+            pendingLoad();
+            setPendingLoad(null);
+          }}
+          onCancel={() => setPendingLoad(null)}
+        />
+      )}
     </div>
   );
 }
