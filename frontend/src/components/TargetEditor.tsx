@@ -1,5 +1,5 @@
 import type { PowerCurveInterval, SwimEffort, Target } from "../api/types";
-import { formatPace, formatSwimPace, formatTarget } from "../api/format";
+import { formatSwimPace, formatTarget } from "../api/format";
 import { POWER_CURVE_INTERVAL_LABELS, SWIM_EFFORT_LABELS, TARGET_KIND_LABELS } from "../lib/steps";
 
 const EFFORTS = ["recovery", "easy", "moderate", "hard", "very_hard", "maximum", "ascending", "descending"] as const;
@@ -12,6 +12,47 @@ interface Props {
   onKindChange: (kind: Target["kind"]) => void;
   onChange: (next: Target) => void;
   disabled?: boolean;
+}
+
+interface PaceInputProps {
+  secPerKm: number;
+  onChange: (secPerKm: number) => void;
+  disabled?: boolean;
+}
+
+// Two number inputs joined by a ":" so min:sec/km reads and edits as one field.
+function PaceInput({ secPerKm, onChange, disabled }: PaceInputProps) {
+  const minutes = Math.floor(secPerKm / 60);
+  const seconds = Math.round(secPerKm % 60);
+
+  const commit = (nextMinutes: number, nextSeconds: number) => {
+    const m = Number.isFinite(nextMinutes) ? Math.max(0, nextMinutes) : 0;
+    const s = Number.isFinite(nextSeconds) ? Math.min(59, Math.max(0, nextSeconds)) : 0;
+    onChange(m * 60 + s);
+  };
+
+  return (
+    <div className="flex w-16 items-center justify-center gap-0.5 rounded-md border border-slate-700 bg-surface-900 px-1.5 py-2 focus-within:border-accent-500">
+      <input
+        className="w-5 min-w-0 bg-transparent text-right text-sm text-slate-100 [appearance:textfield] focus:outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        type="number"
+        min={0}
+        disabled={disabled}
+        value={minutes}
+        onChange={(e) => commit(Number(e.target.value), seconds)}
+      />
+      <span className="text-sm text-slate-500">:</span>
+      <input
+        className="w-6 min-w-0 bg-transparent text-sm text-slate-100 [appearance:textfield] focus:outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        type="number"
+        min={0}
+        max={59}
+        disabled={disabled}
+        value={seconds.toString().padStart(2, "0")}
+        onChange={(e) => commit(minutes, Number(e.target.value))}
+      />
+    </div>
+  );
 }
 
 // Renders a target-kind picker plus whichever kind-specific fields apply.
@@ -35,30 +76,26 @@ export function TargetEditor({ label, target, targetKinds, onKindChange, onChang
       {target.kind === "pace" && (
         <div className="mt-2 grid grid-cols-2 gap-3">
           <div>
-            <label className="label">min (sec/km)</label>
-            <input
-              className="input"
-              type="number"
-              value={target.min_sec_per_km}
-              onChange={(e) => {
+            <label className="label">min (min:sec/km)</label>
+            <PaceInput
+              secPerKm={target.min_sec_per_km}
+              disabled={disabled}
+              onChange={(v) => {
                 if (target.kind !== "pace") return;
-                onChange({ ...target, min_sec_per_km: Number(e.target.value) });
+                onChange({ ...target, min_sec_per_km: v });
               }}
             />
-            <p className="mt-1 text-xs text-slate-500">{formatPace(target.min_sec_per_km)}</p>
           </div>
           <div>
-            <label className="label">max (sec/km)</label>
-            <input
-              className="input"
-              type="number"
-              value={target.max_sec_per_km}
-              onChange={(e) => {
+            <label className="label">max (min:sec/km)</label>
+            <PaceInput
+              secPerKm={target.max_sec_per_km}
+              disabled={disabled}
+              onChange={(v) => {
                 if (target.kind !== "pace") return;
-                onChange({ ...target, max_sec_per_km: Number(e.target.value) });
+                onChange({ ...target, max_sec_per_km: v });
               }}
             />
-            <p className="mt-1 text-xs text-slate-500">{formatPace(target.max_sec_per_km)}</p>
           </div>
         </div>
       )}
