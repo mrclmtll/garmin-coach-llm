@@ -1,5 +1,5 @@
 import type { PowerCurveInterval, SwimEffort, Target } from "../api/types";
-import { formatSwimPace, formatTarget } from "../api/format";
+import { formatTarget } from "../api/format";
 import { POWER_CURVE_INTERVAL_LABELS, SWIM_EFFORT_LABELS, TARGET_KIND_LABELS } from "../lib/steps";
 
 const EFFORTS = ["recovery", "easy", "moderate", "hard", "very_hard", "maximum", "ascending", "descending"] as const;
@@ -15,15 +15,16 @@ interface Props {
 }
 
 interface PaceInputProps {
-  secPerKm: number;
-  onChange: (secPerKm: number) => void;
+  totalSeconds: number;
+  onChange: (totalSeconds: number) => void;
   disabled?: boolean;
 }
 
-// Two number inputs joined by a ":" so min:sec/km reads and edits as one field.
-function PaceInput({ secPerKm, onChange, disabled }: PaceInputProps) {
-  const minutes = Math.floor(secPerKm / 60);
-  const seconds = Math.round(secPerKm % 60);
+// Two number inputs joined by a ":" so a min:sec pace (per km or per 100m)
+// reads and edits as one field.
+function PaceInput({ totalSeconds, onChange, disabled }: PaceInputProps) {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = Math.round(totalSeconds % 60);
 
   const commit = (nextMinutes: number, nextSeconds: number) => {
     const m = Number.isFinite(nextMinutes) ? Math.max(0, nextMinutes) : 0;
@@ -78,7 +79,7 @@ export function TargetEditor({ label, target, targetKinds, onKindChange, onChang
           <div>
             <label className="label">min (min:sec/km)</label>
             <PaceInput
-              secPerKm={target.min_sec_per_km}
+              totalSeconds={target.min_sec_per_km}
               disabled={disabled}
               onChange={(v) => {
                 if (target.kind !== "pace") return;
@@ -89,7 +90,7 @@ export function TargetEditor({ label, target, targetKinds, onKindChange, onChang
           <div>
             <label className="label">max (min:sec/km)</label>
             <PaceInput
-              secPerKm={target.max_sec_per_km}
+              totalSeconds={target.max_sec_per_km}
               disabled={disabled}
               onChange={(v) => {
                 if (target.kind !== "pace") return;
@@ -242,18 +243,16 @@ export function TargetEditor({ label, target, targetKinds, onKindChange, onChang
         </div>
       )}
       {target.kind === "swim_pace" && (
-        <div className="mt-2 w-40">
-          <label className="label">sec / 100m</label>
-          <input
-            className="input"
-            type="number"
-            value={target.sec_per_100m}
-            onChange={(e) => {
+        <div className="mt-2">
+          <label className="label">min:sec / 100m</label>
+          <PaceInput
+            totalSeconds={target.sec_per_100m}
+            disabled={disabled}
+            onChange={(v) => {
               if (target.kind !== "swim_pace") return;
-              onChange({ ...target, sec_per_100m: Number(e.target.value) });
+              onChange({ ...target, sec_per_100m: v });
             }}
           />
-          <p className="mt-1 text-xs text-slate-500">{formatSwimPace(target.sec_per_100m)}</p>
         </div>
       )}
       {target.kind === "swim_css_pace" && (
